@@ -82,6 +82,11 @@ tag fails the build (`skillByLabel` throws).
   component genuinely needs client state; discuss before adding one.
 - Prefer CSS (transitions, `@keyframes`, `animation-timeline`, `@starting-style`) for UI motion.
   Use JavaScript only when CSS cannot do it.
+- The site uses Astro's `<ClientRouter />` (client-side navigation). A component `<script>`
+  therefore runs once per visit, not once per page: start work in an `astro:page-load` listener
+  and dispose it in `astro:before-swap`. See `Background.astro` and `PhotoSwipe.astro`.
+  `PageCurtain.astro` is the shader page transition; links with `data-nav="back"` sweep from
+  the right.
 - Content (text, project entries, links) belongs in content collections, not hard-coded deep
   inside visual components. Articles are **MDX** files in `src/content/experience/` and
   `src/content/topics/`, validated by the schemas in `src/content.config.ts`. MDX lets an

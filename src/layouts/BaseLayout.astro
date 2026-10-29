@@ -3,6 +3,8 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Background from '../components/Background.astro';
+import PageCurtain from '../components/PageCurtain.astro';
+import { ClientRouter } from 'astro:transitions';
 
 interface Props {
   title?: string;
@@ -36,6 +38,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:type" content="website" />
+    <ClientRouter />
   </head>
   <body class="flex min-h-dvh flex-col">
     {starfield ? (
@@ -46,6 +49,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
         class="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--color-ink-soft),_var(--color-ink)_60%)]"
       />
     )}
+    <PageCurtain />
     <Header />
     <main class="flex-1">
       <slot />

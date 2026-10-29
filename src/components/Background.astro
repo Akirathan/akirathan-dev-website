@@ -14,28 +14,40 @@
 </div>
 
 <script>
-  const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-starfield]');
+  import type { StarfieldHandle } from '../gfx/starfield';
+
   const canRender = () =>
     'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
 
-  if (canvas && canRender()) {
+  let handle: StarfieldHandle | null = null;
+
+  // With client-side navigation this script runs once, so start per page and clean up
+  // before each swap.
+  const start = async () => {
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-starfield]');
+    if (!canvas || !canRender()) return;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try {
+      const { startStarfield } = await import('../gfx/starfield');
+      handle = await startStarfield(canvas, { reducedMotion });
+      canvas.dataset.ready = '';
+    } catch (error) {
+      // The gradient stays. Nothing else to do.
+      console.warn('Starfield disabled:', error);
+    }
+  };
 
-    const start = async () => {
-      try {
-        const { startStarfield } = await import('../gfx/starfield');
-        await startStarfield(canvas, { reducedMotion });
-        canvas.dataset.ready = '';
-      } catch (error) {
-        // The gradient stays. Nothing else to do.
-        console.warn('Starfield disabled:', error);
-      }
-    };
-
+  const schedule = () => {
     if ('requestIdleCallback' in window) {
       window.requestIdleCallback(() => void start(), { timeout: 1500 });
     } else {
       setTimeout(() => void start(), 300);
     }
-  }
+  };
+
+  document.addEventListener('astro:page-load', schedule);
+  document.addEventListener('astro:before-swap', () => {
+    handle?.dispose();
+    handle = null;
+  });
 </script>

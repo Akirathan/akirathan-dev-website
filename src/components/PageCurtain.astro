@@ -1,0 +1,86 @@
+---
+/**
+ * Shader page transition. Hooks into Astro's client-side navigation: the curtain covers the
+ * page before the swap and reveals the new page after it. Links with `data-nav="back"` and
+ * browser back navigation sweep from the right; everything else sweeps from the left.
+ *
+ * Without a GPU, or under `prefers-reduced-motion`, Astro's default transition is used.
+ */
+---
+
+<canvas
+  id="page-curtain"
+  transition:persist
+  aria-hidden="true"
+  class="pointer-events-none fixed inset-0 z-100 h-dvh w-screen"
+  style="visibility: hidden"
+></canvas>
+
+<script>
+  import type { PageCurtainHandle } from '../gfx/pageCurtain';
+
+  const canRender = () =>
+    'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let curtain: PageCurtainHandle | null = null;
+
+  /**
+   * Resolves a CSS colour (the theme uses oklch(), which THREE.Color cannot parse) to a hex
+   * string through a 2D canvas.
+   */
+  const cssColorToHex = (cssColor: string, fallback: string) => {
+    try {
+      const ctx = document.createElement('canvas').getContext('2d');
+      if (!ctx) return fallback;
+      ctx.fillStyle = cssColor;
+      ctx.fillRect(0, 0, 1, 1);
+      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+      return `#${[r, g, b].map((c) => c!.toString(16).padStart(2, '0')).join('')}`;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const init = async () => {
+    const canvas = document.getElementById('page-curtain') as HTMLCanvasElement | null;
+    if (!canvas || curtain) return;
+    try {
+      const { startPageCurtain } = await import('../gfx/pageCurtain');
+      const styles = getComputedStyle(document.documentElement);
+      curtain = await startPageCurtain(canvas, {
+        color: cssColorToHex(styles.getPropertyValue('--color-ink-soft').trim(), '#1c2030'),
+        frontColor: cssColorToHex(styles.getPropertyValue('--color-accent-dim').trim(), '#6b8f78'),
+      });
+      // The curtain replaces Astro's default cross-fade.
+      document.documentElement.dataset.curtain = '';
+    } catch (error) {
+      console.warn('Page curtain disabled:', error);
+    }
+  };
+
+  if (canRender() && !reducedMotion) {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => void init(), { timeout: 2500 });
+    } else {
+      setTimeout(() => void init(), 800);
+    }
+
+    document.addEventListener('astro:before-preparation', (event) => {
+      if (!curtain) return;
+      const back =
+        event.direction === 'back' ||
+        (event.sourceElement instanceof HTMLElement && event.sourceElement.dataset.nav === 'back');
+      const load = event.loader;
+      const handle = curtain;
+      // Load the next page while the curtain closes; swap only when both are done.
+      event.loader = async () => {
+        await Promise.all([handle.cover(back ? -1 : 1), load()]);
+      };
+    });
+
+    document.addEventListener('astro:after-swap', () => {
+      void curtain?.reveal();
+    });
+  }
+</script>

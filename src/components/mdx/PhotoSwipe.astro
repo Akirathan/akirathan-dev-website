@@ -71,49 +71,64 @@ const faceUrls = faces.map((f) => f.src);
 </figure>
 
 <script>
+  import type { PhotoSwipeHandle } from '../../gfx/photoSwipe';
+
   const canRender = () =>
     'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
 
-  const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-photo-swipe]');
-  if (canvases.length > 0 && canRender()) {
+  let galleries: PhotoSwipeHandle[] = [];
+
+  // With client-side navigation this script runs once, so start per page and clean up
+  // before each swap.
+  const start = async () => {
+    const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-photo-swipe]');
+    if (canvases.length === 0 || !canRender()) return;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const start = async () => {
-      const { startPhotoSwipe } = await import('../../gfx/photoSwipe');
-      for (const canvas of canvases) {
-        const figure = canvas.closest('.photo-swipe');
-        const caption = figure?.querySelector<HTMLElement>('.photo-swipe-caption');
-        const dots = [...(figure?.querySelectorAll<HTMLButtonElement>('button[data-index]') ?? [])];
-        const alts = JSON.parse(canvas.dataset.alts ?? '[]') as string[];
-        try {
-          const faces = JSON.parse(canvas.dataset.faces ?? '[]') as string[];
-          const aspect = Number(canvas.dataset.aspect) || 4 / 3;
-          const gallery = await startPhotoSwipe(canvas, {
-            faces,
-            aspect,
-            autoAdvance: !reducedMotion,
-            onChange(index) {
-              canvas.setAttribute('aria-label', alts[index] ?? '');
-              if (caption) caption.textContent = alts[index] ?? '';
-              dots.forEach((dot, i) => {
-                if (i === index) dot.setAttribute('aria-current', 'true');
-                else dot.removeAttribute('aria-current');
-              });
-            },
-          });
-          dots.forEach((dot, i) => dot.addEventListener('click', () => gallery.goTo(i)));
-          canvas.closest('.photo-swipe')?.setAttribute('data-ready', '');
-        } catch (error) {
-          // The photo strip stays.
-          console.warn('Photo swipe disabled:', error);
-        }
+    const { startPhotoSwipe } = await import('../../gfx/photoSwipe');
+    for (const canvas of canvases) {
+      const figure = canvas.closest('.photo-swipe');
+      const caption = figure?.querySelector<HTMLElement>('.photo-swipe-caption');
+      const dots = [...(figure?.querySelectorAll<HTMLButtonElement>('button[data-index]') ?? [])];
+      const alts = JSON.parse(canvas.dataset.alts ?? '[]') as string[];
+      try {
+        const faces = JSON.parse(canvas.dataset.faces ?? '[]') as string[];
+        const aspect = Number(canvas.dataset.aspect) || 4 / 3;
+        const gallery = await startPhotoSwipe(canvas, {
+          faces,
+          aspect,
+          autoAdvance: !reducedMotion,
+          onChange(index) {
+            canvas.setAttribute('aria-label', alts[index] ?? '');
+            if (caption) caption.textContent = alts[index] ?? '';
+            dots.forEach((dot, i) => {
+              if (i === index) dot.setAttribute('aria-current', 'true');
+              else dot.removeAttribute('aria-current');
+            });
+          },
+        });
+        galleries.push(gallery);
+        dots.forEach((dot, i) => dot.addEventListener('click', () => gallery.goTo(i)));
+        figure?.setAttribute('data-ready', '');
+      } catch (error) {
+        // The photo strip stays.
+        console.warn('Photo swipe disabled:', error);
       }
-    };
+    }
+  };
+
+  const schedule = () => {
     if ('requestIdleCallback' in window) {
       window.requestIdleCallback(() => void start(), { timeout: 2000 });
     } else {
       setTimeout(() => void start(), 500);
     }
-  }
+  };
+
+  document.addEventListener('astro:page-load', schedule);
+  document.addEventListener('astro:before-swap', () => {
+    for (const g of galleries) g.dispose();
+    galleries = [];
+  });
 </script>
 
 <style>
