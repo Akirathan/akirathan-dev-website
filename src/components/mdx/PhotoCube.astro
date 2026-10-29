@@ -3,10 +3,11 @@ import { getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 
 /**
- * A slowly rotating cube with photos on its faces. CSS 3D only, no JavaScript.
+ * A photo cube with three photos on opposite face pairs.
  *
- * Three photos cover six faces (each photo is on two opposite faces). Hover pauses the
- * rotation; `prefers-reduced-motion` shows a still, angled cube.
+ * The page renders a CSS 3D cube first (slow rotation, no JavaScript). When the browser can,
+ * a Three.js cube (src/gfx/photoCube.ts) takes its place: drag to turn it, with inertia and a
+ * slow idle rotation. Under `prefers-reduced-motion` nothing turns by itself; dragging works.
  *
  * Usage in .mdx:
  *   import PhotoCube from '../../components/mdx/PhotoCube.astro';
@@ -18,7 +19,7 @@ interface Props {
   alts: [string, string, string];
   /** CSS length for the cube edge. */
   size?: string;
-  /** Seconds for one full turn. */
+  /** Seconds for one full turn of the CSS fallback. */
   period?: number;
 }
 
@@ -27,12 +28,16 @@ const { images, alts, size = 'min(18rem, 60vw)', period = 28 } = Astro.props;
 const faces = await Promise.all(
   images.map((src) => getImage({ src, width: 720, height: 720, fit: 'cover', format: 'webp' })),
 );
+const faceUrls = faces.map((f) => f.src);
 
-// Face order: front, back, right, left, top, bottom. Opposite faces share a photo.
+// CSS face order: front, back, right, left, top, bottom. Opposite faces share a photo.
 const order = [0, 0, 1, 1, 2, 2] as const;
 ---
 
-<figure class="not-prose my-12 flex justify-center" style={`--size: ${size}; --period: ${period}s`}>
+<figure
+  class="photo-cube-figure not-prose my-12 flex justify-center"
+  style={`--size: ${size}; --period: ${period}s`}
+>
   <div class="photo-cube-scene">
     <div class="photo-cube">
       {order.map((i, face) => (
@@ -47,16 +52,76 @@ const order = [0, 0, 1, 1, 2, 2] as const;
         />
       ))}
     </div>
+    <canvas
+      class="photo-cube-canvas"
+      data-photo-cube
+      data-faces={JSON.stringify(faceUrls)}
+      aria-label={`Photo cube: ${alts.join('; ')}. Drag to turn.`}
+      role="img"
+    ></canvas>
   </div>
 </figure>
 
+<script>
+  const canRender = () =>
+    'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
+
+  const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-photo-cube]');
+  if (canvases.length > 0 && canRender()) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const start = async () => {
+      const { startPhotoCube } = await import('../../gfx/photoCube');
+      for (const canvas of canvases) {
+        try {
+          const faces = JSON.parse(canvas.dataset.faces ?? '[]') as [string, string, string];
+          await startPhotoCube(canvas, { faces, autoRotate: !reducedMotion });
+          canvas.closest('.photo-cube-scene')?.setAttribute('data-ready', '');
+        } catch (error) {
+          // The CSS cube stays.
+          console.warn('Photo cube disabled:', error);
+        }
+      }
+    };
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => void start(), { timeout: 2000 });
+    } else {
+      setTimeout(() => void start(), 500);
+    }
+  }
+</script>
+
 <style>
   .photo-cube-scene {
+    position: relative;
     width: var(--size);
     height: var(--size);
     perspective: calc(var(--size) * 3.2);
     /* The turned cube is drawn outside its box: keep it off the text above and below. */
     margin-block: calc(var(--size) * 0.25);
+  }
+
+  /* The Three.js canvas is larger than the cube so that corners are never clipped. */
+  .photo-cube-canvas {
+    position: absolute;
+    inset: calc(var(--size) * -0.3);
+    width: calc(var(--size) * 1.6);
+    height: calc(var(--size) * 1.6);
+    opacity: 0;
+    transition: opacity 600ms ease;
+    /* Horizontal drags turn the cube; vertical swipes still scroll the page on touch. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .photo-cube-scene[data-ready] .photo-cube-canvas {
+    opacity: 1;
+  }
+
+  .photo-cube-scene[data-ready] .photo-cube {
+    opacity: 0;
+    transition: opacity 600ms ease;
+    pointer-events: none;
   }
 
   .photo-cube {
@@ -67,10 +132,6 @@ const order = [0, 0, 1, 1, 2, 2] as const;
     /* A still, pleasant angle for reduced motion and as the animation start. */
     transform: rotateX(-18deg) rotateY(32deg);
     animation: photo-cube-turn var(--period) linear infinite;
-  }
-
-  .photo-cube-scene:hover .photo-cube {
-    animation-play-state: paused;
   }
 
   .photo-cube-face {
