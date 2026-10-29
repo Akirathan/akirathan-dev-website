@@ -1,13 +1,88 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Card from '../components/Card.astro';
+
+const byOrder = <T extends { data: { order: number } }>(a: T, b: T) => a.data.order - b.data.order;
+
+const experience = (await getCollection('experience')).sort(byOrder);
+const mainJobs = experience.filter((e) => !e.data.minor);
+const minorJobs = experience.filter((e) => e.data.minor);
+const topics = (await getCollection('topics')).sort(byOrder);
 ---
 
-<BaseLayout>
-  <main class="grid min-h-dvh place-items-center px-4">
-    <div class="text-center">
-      <p class="font-mono text-sm tracking-widest text-accent uppercase">akirathan.dev</p>
-      <h1 class="mt-4 text-5xl font-bold tracking-tight sm:text-7xl">Pavel Marek</h1>
-      <p class="mt-6 text-lg text-paper/70">Something is being built here.</p>
+<BaseLayout starfield>
+  <!-- Hero -->
+  <section class="mx-auto flex min-h-[70dvh] w-full max-w-6xl flex-col justify-center px-4 py-16 sm:px-6">
+    <p class="text-sm font-medium tracking-widest text-accent uppercase">Pavel Marek · Brno</p>
+    <h1 class="mt-4 max-w-4xl text-5xl font-bold tracking-tight text-balance sm:text-7xl">
+      I make languages fast and businesses run.
+    </h1>
+    <ul class="mt-8 max-w-2xl space-y-2 text-lg text-paper/80">
+      <li>Senior software engineer: compilers, interpreters, and runtime internals.</li>
+      <li>JVM, GraalVM Native Image, and the Truffle ecosystem.</li>
+      <li>Co-founder &amp; CTO of a plant showroom and e-shop.</li>
+    </ul>
+    <div class="mt-10 flex flex-wrap gap-3">
+      <a
+        href="#work"
+        class="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper"
+      >
+        See my work
+      </a>
+      <a
+        href="#about"
+        class="rounded-full border border-paper/20 px-5 py-2.5 text-sm font-semibold transition-colors hover:border-accent hover:text-accent"
+      >
+        More about me
+      </a>
     </div>
-  </main>
+  </section>
+
+  <!-- Work -->
+  <section id="work" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+    <h2 class="reveal text-3xl font-bold tracking-tight sm:text-4xl">Work</h2>
+    <div class="mt-8 grid gap-5 md:grid-cols-3">
+      {mainJobs.map((job) => (
+        <Card
+          href={`/work/${job.id}`}
+          eyebrow={job.data.period}
+          title={job.data.company}
+          meta={job.data.role}
+          bullets={job.data.summary}
+        />
+      ))}
+    </div>
+    {minorJobs.length > 0 && (
+      <p class="reveal mt-6 text-sm text-muted">
+        Earlier:{' '}
+        {minorJobs.map((job, i) => (
+          <>
+            <a
+              href={`/work/${job.id}`}
+              class="underline-offset-4 hover:text-accent hover:underline"
+            >
+              {job.data.role} at {job.data.company}
+            </a>{' '}
+            ({job.data.period}){i < minorJobs.length - 1 ? ', ' : '.'}
+          </>
+        ))}
+      </p>
+    )}
+  </section>
+
+  <!-- About -->
+  <section id="about" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+    <h2 class="reveal text-3xl font-bold tracking-tight sm:text-4xl">About me</h2>
+    <div class="mt-8 grid gap-5 sm:grid-cols-2">
+      {topics.map((topic) => (
+        <Card
+          href={`/${topic.id}`}
+          title={topic.data.title}
+          meta={topic.data.tagline}
+          bullets={topic.data.summary}
+        />
+      ))}
+    </div>
+  </section>
 </BaseLayout>

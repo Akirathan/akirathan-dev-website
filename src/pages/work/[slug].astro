@@ -1,0 +1,44 @@
+---
+import { getCollection, render } from 'astro:content';
+import ArticleLayout from '../../layouts/ArticleLayout.astro';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('experience');
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const { company, role, period, location, tags, links, summary } = entry.data;
+---
+
+<ArticleLayout
+  title={company}
+  description={summary[0] ?? `${role} at ${company}`}
+  eyebrow={period}
+  meta={`${role} · ${location}`}
+  backHref="/#work"
+  backLabel="All work"
+>
+  <Fragment slot="header">
+    {tags.length > 0 && (
+      <ul class="mt-5 flex flex-wrap gap-2">
+        {tags.map((tag) => (
+          <li class="rounded-full border border-paper/10 px-3 py-1 text-xs text-muted">{tag}</li>
+        ))}
+      </ul>
+    )}
+    {links.length > 0 && (
+      <ul class="mt-5 flex flex-wrap gap-4 text-sm">
+        {links.map((l) => (
+          <li>
+            <a href={l.url} target="_blank" rel="noreferrer" class="text-accent hover:underline">
+              {l.label} ↗
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </Fragment>
+  <Content />
+</ArticleLayout>

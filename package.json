@@ -15,13 +15,20 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/markdown-satteri": "^0.4.6",
+    "@astrojs/mdx": "^8.1.2",
     "@astrojs/sitemap": "^3.7.4",
+    "@fontsource-variable/baloo-2": "^5.3.0",
+    "@fontsource-variable/montserrat": "^5.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.4.4",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
+    "@tailwindcss/typography": "^0.5.20",
+    "@types/three": "^0.186.0",
     "prettier": "^3.9.10",
     "prettier-plugin-astro": "^1.1.2",
     "prettier-plugin-tailwindcss": "^0.8.1",

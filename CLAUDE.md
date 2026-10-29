@@ -2,10 +2,25 @@
 
 Personal portfolio website of Pavel Marek, served at https://akirathan.dev.
 
-The site exists to support a job search, so it should stand out: heavily customized visuals,
-GPU-driven animations (WebGPU, likely via Three.js), and interactions that do not look like a
-template portfolio. Visual ambition is the point, but it must never cost content, accessibility,
-or first-load performance.
+The site exists to support a job search, so it should stand out: customized visuals, GPU-driven
+animations (Three.js with WebGPU), and interactions that do not look like a template portfolio.
+Visual ambition matters, but it must never cost content, accessibility, or first-load performance.
+
+## Design direction
+
+The reference for the _amount_ of motion is https://www.shopify.com/editions/fall2026. That is the
+ceiling, not the floor. Game-like portfolios (3D worlds, corridors, loading screens) are explicitly
+not wanted: text content must always be one click away and easy to read.
+
+- Landing page: short texts with bullets, more effects than text. Long, article-like texts live on
+  detail pages reached by click-through.
+- One stable background. The background may react (pointer, scroll) and may shift colour between
+  sections, but only subtly. No drastic per-section colour changes.
+- Colours: subtle and elegant, dark base, never a clear white background, nothing that screams.
+  No flashing or strobing of any kind.
+- Fonts: "Baloo 2" for headings, Montserrat for body text (self-hosted via `@fontsource-variable`).
+  Do not introduce other display fonts for running text.
+- No audio. Never add sound effects, music, or autoplay media with sound.
 
 ## Stack
 
@@ -15,6 +30,9 @@ or first-load performance.
 - **Tailwind CSS v4** via `@tailwindcss/vite`. Theme tokens live in `src/styles/global.css`
   under `@theme`. There is no `tailwind.config.*` file.
 - **@astrojs/sitemap** generates `sitemap-index.xml` from `site` in `astro.config.mjs`.
+- **Three.js** (`three`, `@types/three`) for GPU visuals, loaded lazily on the client only.
+- **Fonts:** `@fontsource-variable/baloo-2` and `@fontsource-variable/montserrat`, imported in
+  `global.css`; exposed as `font-heading` and `font-sans` utilities through `@theme`.
 - **Prettier** with `prettier-plugin-astro` and `prettier-plugin-tailwindcss` (sorts classes).
 - Node.js 24 (`.nvmrc`). Astro 7 needs Node >= 22.23.4.
 
@@ -60,8 +78,11 @@ GPU/shader code and `src/content/` for content collections (projects, posts).
   component genuinely needs client state; discuss before adding one.
 - Prefer CSS (transitions, `@keyframes`, `animation-timeline`, `@starting-style`) for UI motion.
   Use JavaScript only when CSS cannot do it.
-- Content (text, project entries, links) belongs in data or content collections, not hard-coded
-  deep inside visual components.
+- Content (text, project entries, links) belongs in content collections, not hard-coded deep
+  inside visual components. Articles are **MDX** files in `src/content/experience/` and
+  `src/content/topics/`, validated by the schemas in `src/content.config.ts`. MDX lets an
+  article import Astro components (for example from `src/components/mdx/`) for custom layout or
+  effects inside the text. In MDX, `{`, `}` and `<` in prose must be escaped or put in code spans.
 
 ## Graphics and animation rules
 

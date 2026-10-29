@@ -1,0 +1,21 @@
+---
+/**
+ * Side note inside an MDX article.
+ *
+ * Usage in .mdx:
+ *   import Aside from '../../components/mdx/Aside.astro';
+ *   <Aside title="Why it mattered">Text, with **Markdown** inside.</Aside>
+ */
+interface Props {
+  title?: string;
+}
+
+const { title } = Astro.props;
+---
+
+<aside class="not-prose my-8 rounded-2xl border border-accent/30 bg-ink-soft/60 px-6 py-5">
+  {title && <p class="font-heading text-lg font-semibold text-accent">{title}</p>}
+  <div class="mt-1 text-paper/85 [&_p]:my-2 [&_a]:text-accent [&_a:hover]:underline">
+    <slot />
+  </div>
+</aside>

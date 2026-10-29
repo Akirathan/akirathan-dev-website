@@ -1,0 +1,36 @@
+---
+company: Enso
+role: Compiler Engineer
+period: 2022 – 2026
+location: Remote, Czechia
+order: 2
+summary:
+  - Designed and implemented parts of Enso's language engine, from compiler to runtime.
+  - Led the migration of a mixed Java/Scala codebase to the Java Platform Module System.
+  - Built the performance-benchmarking system; moved the engine to GraalVM Native Image.
+tags: [Java, Scala, GraalVM, Truffle, Native Image, JPMS, Compilers]
+links:
+  - label: enso-org/enso on GitHub
+    url: https://github.com/enso-org/enso
+---
+
+For more than three years I worked on the design and implementation of Enso's language engine,
+contributing across compilation, interpretation, runtime behaviour, and language features. The
+work covers the full pipeline, and all of it is open source in Enso's public GitHub repository.
+
+## Key contributions
+
+- **Compiler and runtime engineering.** Work on the static and dynamic compiler, the interpreter,
+  and the runtime instrumentation behind Enso's visual programming environment.
+- **Native Image migration.** Helped move the engine to GraalVM Native Image, which cut startup
+  time significantly.
+- **Benchmarking infrastructure.** Built a complete performance-benchmarking system, with
+  automated measurements and visualisations to track regressions and guide optimisation.
+- **IR simplification.** Modernised Enso's custom intermediate representation: removed legacy
+  Scala dependencies, reduced boilerplate, and added graph visualisations for debugging.
+- **JPMS migration.** Led the adoption of the Java Platform Module System across a mixed
+  Java/Scala codebase to meet new Truffle requirements. Solved deep dependency, class-loader, and
+  module-layer problems and delivered a fully modular engine. I presented this work at GeeCON
+  Kraków 2024.
+- **Language design.** Designed and implemented two language features: the `private` keyword for
+  proper encapsulation, and the semantics of equality, hashing, and comparators.

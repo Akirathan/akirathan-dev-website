@@ -1,17 +1,63 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/baloo-2';
+@import '@fontsource-variable/montserrat';
+@plugin '@tailwindcss/typography';
 
 @theme {
-  --color-ink: oklch(0.16 0.01 260);
-  --color-paper: oklch(0.96 0.01 90);
-  --color-accent: oklch(0.82 0.18 140);
+  --font-sans: 'Montserrat Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Baloo 2 Variable', 'Montserrat Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Dark, slightly blue base. Text is warm off-white. Accent is a muted sage green. */
+  --color-ink: oklch(0.17 0.015 260);
+  --color-ink-soft: oklch(0.22 0.018 260);
+  --color-paper: oklch(0.94 0.01 90);
+  --color-muted: oklch(0.72 0.012 260);
+  --color-accent: oklch(0.8 0.09 150);
+  --color-accent-dim: oklch(0.6 0.07 150);
+
+  --animate-reveal: reveal both;
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      translate: 0 1.5rem;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
 }
 
 @layer base {
   html {
     color-scheme: dark;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-ink text-paper antialiased;
+    @apply bg-ink font-sans text-paper antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+  }
+
+  ::selection {
+    @apply bg-accent/30;
+  }
+}
+
+@utility reveal {
+  /* Scroll-driven entrance. Browsers without view() timelines show the element as is. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      animation: var(--animate-reveal);
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
   }
 }

@@ -1,13 +1,21 @@
 ---
 import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Background from '../components/Background.astro';
 
 interface Props {
   title?: string;
   description?: string;
+  /** Render the animated starfield. Detail pages keep only the static gradient. */
+  starfield?: boolean;
 }
 
-const { title = 'Pavel Marek', description = 'Personal website and portfolio of Pavel Marek.' } =
-  Astro.props;
+const {
+  title = 'Pavel Marek',
+  description = 'Senior software engineer: compilers, runtimes, the JVM and GraalVM. Co-founder & CTO of Lístky radosti.',
+  starfield = false,
+} = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
 ---
@@ -29,7 +37,19 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:url" content={canonical} />
     <meta property="og:type" content="website" />
   </head>
-  <body class="min-h-dvh">
-    <slot />
+  <body class="flex min-h-dvh flex-col">
+    {starfield ? (
+      <Background />
+    ) : (
+      <div
+        aria-hidden="true"
+        class="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--color-ink-soft),_var(--color-ink)_60%)]"
+      />
+    )}
+    <Header />
+    <main class="flex-1">
+      <slot />
+    </main>
+    <Footer />
   </body>
 </html>
