@@ -14,16 +14,23 @@ links:
     url: https://www.listkyradosti.cz
 ---
 
-import Aside from '../../components/mdx/Aside.astro';
+import PhotoCube from '../../components/mdx/PhotoCube.astro';
+import asianWall from '../../assets/listky/asian-wall.jpg';
+import verticalWall from '../../assets/listky/vertical-wall.jpg';
+import growRoom from '../../assets/listky/grow-room.jpg';
 
 In January 2026 I co-founded Lístky radosti, a 400 m² plant showroom and e-commerce store in
 Brno. I designed and built its entire technical side as CTO, and I also carried the CFO and
 co-CEO roles in the first year.
 
-<Aside title="Why a compiler engineer sells plants">
-  This is an MDX component. Replace this text, or delete the block. Components like this one live in
-  `src/components/mdx/`.
-</Aside>
+<PhotoCube
+  images={[asianWall, verticalWall, growRoom]}
+  alts={[
+    'The Asian wall in the showroom: plants growing from cork branches',
+    'The vertical green wall',
+    'The grow room',
+  ]}
+/>
 
 ## What I built
 
