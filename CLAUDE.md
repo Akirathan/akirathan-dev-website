@@ -34,7 +34,8 @@ npm run format:check
 When starting the dev server as an agent, use background mode: `npx astro dev --background`,
 then manage it with `npx astro dev stop | status | logs`.
 
-Before considering a change done, run `npm run check` and `npm run build`. CI runs both.
+Before considering a change done, run `npm run check` and `npm run build`. There is no CI, so
+these local runs are the only check.
 
 ## Structure
 
@@ -45,7 +46,6 @@ src/
   layouts/           page shells; BaseLayout.astro holds <head>, meta, global CSS
   components/        Astro components (and framework islands, if one is added)
   styles/global.css  Tailwind import, @theme tokens, base layer
-.github/workflows/   deploy.yml: build and deploy to GitHub Pages on push to main
 ```
 
 Add new top-level folders under `src/` only with a clear purpose, for example `src/gfx/` for
@@ -80,9 +80,9 @@ Heavy visuals are progressive enhancement. The page must be complete and readabl
 
 ## Deployment
 
-- GitHub Actions (`.github/workflows/deploy.yml`) runs `npm ci`, `npm run check`,
-  `npm run build`, and deploys `dist/` to GitHub Pages. In the repo settings, Pages source must
-  be "GitHub Actions".
+- The site is not published yet, and GitHub Pages is off. Do not enable it until the owner asks.
+- Do not add GitHub Actions workflows (no CI, no deploy workflow): the owner's Actions quota is
+  limited. Deployment will be decided at launch.
 - Custom domain `akirathan.dev` (registered at Cloudflare). `public/CNAME` must keep containing
   exactly `akirathan.dev`. DNS: apex `A` records to the GitHub Pages IPs (185.199.108.153,
   185.199.109.153, 185.199.110.153, 185.199.111.153), and `www` as a `CNAME` to

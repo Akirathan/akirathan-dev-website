@@ -2,7 +2,7 @@
 
 Personal website and portfolio of Pavel Marek, live at [akirathan.dev](https://akirathan.dev).
 
-Built with [Astro](https://astro.build), TypeScript, and [Tailwind CSS](https://tailwindcss.com). Deployed to GitHub Pages.
+Built with [Astro](https://astro.build), TypeScript, and [Tailwind CSS](https://tailwindcss.com).
 
 ## Development
 
@@ -22,8 +22,3 @@ npm run dev
 | `npm run check`        | Type-check `.astro` and `.ts` files      |
 | `npm run format`       | Format all files with Prettier           |
 | `npm run format:check` | Check formatting without changing files  |
-
-## Deployment
-
-Every push to `main` builds the site and deploys it to GitHub Pages through
-`.github/workflows/deploy.yml`.
