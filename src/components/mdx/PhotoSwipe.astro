@@ -1,0 +1,209 @@
+---
+import { getImage } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+/**
+ * A photo gallery with a GPU transition between photos.
+ *
+ * The page renders a plain horizontal strip of the photos first (no JavaScript needed). When
+ * the browser can, the Three.js gallery (src/gfx/photoSwipe.ts) fades in over it: one large
+ * photo, and a liquid wipe to the next on drag, click of a dot, arrow keys, or by itself after
+ * a few seconds. Under `prefers-reduced-motion` it does not advance by itself.
+ *
+ * Usage in .mdx:
+ *   import PhotoSwipe from '../../components/mdx/PhotoSwipe.astro';
+ *   import a from '../../assets/x/a.jpg';
+ *   <PhotoSwipe images={[a, b, c]} alts={['...', '...', '...']} />
+ */
+interface Props {
+  images: ImageMetadata[];
+  alts: string[];
+  /** Width / height of the gallery box. Defaults to the first photo's ratio. */
+  aspect?: number;
+}
+
+const { images, alts } = Astro.props;
+if (images.length < 2) throw new Error('PhotoSwipe needs at least two images.');
+if (alts.length !== images.length) throw new Error('PhotoSwipe: one alt text per image.');
+
+const aspect = Astro.props.aspect ?? images[0]!.width / images[0]!.height;
+const faces = await Promise.all(
+  images.map((src) => getImage({ src, width: 1400, format: 'webp' })),
+);
+const faceUrls = faces.map((f) => f.src);
+---
+
+<figure class="photo-swipe not-prose my-12" style={`--aspect: ${aspect}`}>
+  <div class="photo-swipe-scene">
+    <ul class="photo-swipe-strip">
+      {faces.map((face, i) => (
+        <li>
+          <img src={face.src} {...face.attributes} alt={alts[i]} loading="lazy" decoding="async" />
+        </li>
+      ))}
+    </ul>
+    <canvas
+      class="photo-swipe-canvas"
+      data-photo-swipe
+      data-faces={JSON.stringify(faceUrls)}
+      data-alts={JSON.stringify(alts)}
+      data-aspect={aspect}
+      tabindex="0"
+      role="img"
+      aria-label={alts[0]}
+    ></canvas>
+  </div>
+  <figcaption class="photo-swipe-nav">
+    <span class="photo-swipe-caption" aria-live="polite">
+      {alts[0]}
+    </span>
+    <span class="photo-swipe-dots" role="group" aria-label="Choose a photo">
+      {alts.map((alt, i) => (
+        <button
+          type="button"
+          data-index={i}
+          aria-label={alt}
+          aria-current={i === 0 ? 'true' : undefined}
+        />
+      ))}
+    </span>
+  </figcaption>
+</figure>
+
+<script>
+  const canRender = () =>
+    'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
+
+  const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-photo-swipe]');
+  if (canvases.length > 0 && canRender()) {
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const start = async () => {
+      const { startPhotoSwipe } = await import('../../gfx/photoSwipe');
+      for (const canvas of canvases) {
+        const figure = canvas.closest('.photo-swipe');
+        const caption = figure?.querySelector<HTMLElement>('.photo-swipe-caption');
+        const dots = [...(figure?.querySelectorAll<HTMLButtonElement>('button[data-index]') ?? [])];
+        const alts = JSON.parse(canvas.dataset.alts ?? '[]') as string[];
+        try {
+          const faces = JSON.parse(canvas.dataset.faces ?? '[]') as string[];
+          const aspect = Number(canvas.dataset.aspect) || 4 / 3;
+          const gallery = await startPhotoSwipe(canvas, {
+            faces,
+            aspect,
+            autoAdvance: !reducedMotion,
+            onChange(index) {
+              canvas.setAttribute('aria-label', alts[index] ?? '');
+              if (caption) caption.textContent = alts[index] ?? '';
+              dots.forEach((dot, i) => {
+                if (i === index) dot.setAttribute('aria-current', 'true');
+                else dot.removeAttribute('aria-current');
+              });
+            },
+          });
+          dots.forEach((dot, i) => dot.addEventListener('click', () => gallery.goTo(i)));
+          canvas.closest('.photo-swipe')?.setAttribute('data-ready', '');
+        } catch (error) {
+          // The photo strip stays.
+          console.warn('Photo swipe disabled:', error);
+        }
+      }
+    };
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => void start(), { timeout: 2000 });
+    } else {
+      setTimeout(() => void start(), 500);
+    }
+  }
+</script>
+
+<style>
+  .photo-swipe-scene {
+    position: relative;
+    aspect-ratio: var(--aspect);
+    max-height: 70vh;
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--color-ink-soft);
+  }
+
+  /* Fallback and first paint: a scrollable strip of the photos. */
+  .photo-swipe-strip {
+    display: flex;
+    gap: 0.75rem;
+    height: 100%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    transition: opacity 600ms ease;
+  }
+  .photo-swipe-strip li {
+    flex: 0 0 auto;
+    height: 100%;
+    scroll-snap-align: center;
+  }
+  .photo-swipe-strip img {
+    height: 100%;
+    width: auto;
+  }
+
+  .photo-swipe-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 600ms ease;
+    /* Horizontal drags change the photo; vertical swipes still scroll the page on touch. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    outline-offset: 4px;
+  }
+  .photo-swipe-canvas:focus-visible {
+    outline: 2px solid var(--color-accent);
+  }
+
+  .photo-swipe[data-ready] .photo-swipe-canvas {
+    opacity: 1;
+  }
+  .photo-swipe[data-ready] .photo-swipe-strip {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .photo-swipe-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-muted);
+    opacity: 0;
+    transition: opacity 600ms ease;
+  }
+  .photo-swipe[data-ready] .photo-swipe-nav {
+    opacity: 1;
+  }
+
+  .photo-swipe-dots {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .photo-swipe-dots button {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    background: color-mix(in oklch, var(--color-paper) 25%, transparent);
+    transition:
+      background 300ms ease,
+      transform 300ms ease;
+  }
+  .photo-swipe-dots button:hover {
+    background: color-mix(in oklch, var(--color-paper) 60%, transparent);
+  }
+  .photo-swipe-dots button[aria-current='true'] {
+    background: var(--color-accent);
+    transform: scale(1.25);
+  }
+</style>
