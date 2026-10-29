@@ -2,6 +2,8 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Card from '../components/Card.astro';
+import SkillChip from '../components/SkillChip.astro';
+import { skills } from '../data/skills';
 
 const byOrder = <T extends { data: { order: number } }>(a: T, b: T) => a.data.order - b.data.order;
 
@@ -69,6 +71,23 @@ const topics = (await getCollection('topics')).sort(byOrder);
         ))}
       </p>
     )}
+  </section>
+
+  <!-- Skills -->
+  <section id="skills" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+    <div class="reveal flex flex-wrap items-end justify-between gap-4">
+      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Skills in keywords</h2>
+      <a href="/skills" class="text-sm font-medium text-accent hover:underline">
+        With details →
+      </a>
+    </div>
+    <ul class="reveal mt-8 flex flex-wrap gap-2">
+      {skills.map((skill) => (
+        <li>
+          <SkillChip skill={skill} size="md" />
+        </li>
+      ))}
+    </ul>
   </section>
 
   <!-- About -->

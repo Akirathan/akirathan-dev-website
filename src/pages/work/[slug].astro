@@ -1,6 +1,8 @@
 ---
 import { getCollection, render } from 'astro:content';
 import ArticleLayout from '../../layouts/ArticleLayout.astro';
+import SkillChip from '../../components/SkillChip.astro';
+import { skillByLabel } from '../../data/skills';
 
 export async function getStaticPaths() {
   const entries = await getCollection('experience');
@@ -10,6 +12,8 @@ export async function getStaticPaths() {
 const { entry } = Astro.props;
 const { Content } = await render(entry);
 const { company, role, period, location, tags, links, summary } = entry.data;
+// Throws on an unknown tag, so a typo fails the build instead of producing a dead link.
+const skills = tags.map(skillByLabel);
 ---
 
 <ArticleLayout
@@ -21,10 +25,12 @@ const { company, role, period, location, tags, links, summary } = entry.data;
   backLabel="All work"
 >
   <Fragment slot="header">
-    {tags.length > 0 && (
+    {skills.length > 0 && (
       <ul class="mt-5 flex flex-wrap gap-2">
-        {tags.map((tag) => (
-          <li class="rounded-full border border-paper/10 px-3 py-1 text-xs text-muted">{tag}</li>
+        {skills.map((skill) => (
+          <li>
+            <SkillChip skill={skill} />
+          </li>
         ))}
       </ul>
     )}

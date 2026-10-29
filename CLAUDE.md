@@ -64,10 +64,14 @@ src/
   layouts/           page shells; BaseLayout.astro holds <head>, meta, global CSS
   components/        Astro components (and framework islands, if one is added)
   styles/global.css  Tailwind import, @theme tokens, base layer
+  content/           MDX articles (experience/, topics/), validated by src/content.config.ts
+  data/skills.ts     skills as keywords; experience tags must match a skill label exactly
+  gfx/               Three.js / shader code, loaded lazily on the client
 ```
 
-Add new top-level folders under `src/` only with a clear purpose, for example `src/gfx/` for
-GPU/shader code and `src/content/` for content collections (projects, posts).
+`/skills` lists every skill as a chip (`SkillChip.astro`) grouped by category, with the work
+entries that use it. Experience tags render as chips that link to `/skills#<slug>`; an unknown
+tag fails the build (`skillByLabel` throws).
 
 ## Conventions
 
@@ -115,3 +119,7 @@ Heavy visuals are progressive enhancement. The page must be complete and readabl
 - Astro: https://docs.astro.build (routing, components, content collections, styling)
 - Tailwind CSS v4: https://tailwindcss.com/docs
 - Three.js WebGPU renderer and TSL: https://threejs.org/docs
+
+```
+
+```
