@@ -5,6 +5,8 @@ import Footer from '../components/Footer.astro';
 import Background from '../components/Background.astro';
 import PageCurtain from '../components/PageCurtain.astro';
 import { ClientRouter } from 'astro:transitions';
+import { getImage } from 'astro:assets';
+import portrait from '../assets/portrait.jpg';
 
 interface Props {
   title?: string;
@@ -20,6 +22,9 @@ const {
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
+// Social preview: the portrait, square, as link previews expect.
+const ogImage = await getImage({ src: portrait, width: 1200, height: 1200, fit: 'cover' });
+const ogImageUrl = new URL(ogImage.src, Astro.site);
 ---
 
 <!doctype html>
@@ -38,6 +43,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta name="twitter:card" content="summary" />
     <ClientRouter />
   </head>
   <body class="flex min-h-dvh flex-col">
