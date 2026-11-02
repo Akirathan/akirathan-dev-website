@@ -4,6 +4,7 @@ import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import portrait from '../assets/portrait.jpg';
 import Card from '../components/Card.astro';
+import CpuScene from '../components/CpuScene.astro';
 import SkillChip from '../components/SkillChip.astro';
 import { skills } from '../data/skills';
 
@@ -53,6 +54,11 @@ const topics = (await getCollection('topics')).sort(byOrder);
       loading="eager"
       fetchpriority="high"
     />
+  </section>
+
+  <!-- A procedural CPU: the one object on the page that is pure effect. -->
+  <section class="mx-auto w-full max-w-6xl px-4 sm:px-6">
+    <CpuScene class="h-[52dvh] max-h-[34rem] min-h-72" />
   </section>
 
   <!-- Work -->

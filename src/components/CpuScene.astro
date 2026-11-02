@@ -1,0 +1,74 @@
+---
+/**
+ * A procedural CPU that assembles when scrolled into view, then turns slowly and follows the
+ * pointer. Decorative: reserve the space with the `class` prop (height), nothing else is
+ * needed. Without a GPU the space stays empty.
+ */
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={['relative', className]} aria-hidden="true">
+  <canvas
+    data-cpu-scene
+    class="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-1000 data-ready:opacity-100"
+  ></canvas>
+</div>
+
+<script>
+  import type { CpuHandle } from '../gfx/cpu';
+
+  const canRender = () =>
+    'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
+
+  let handles: CpuHandle[] = [];
+
+  const start = async () => {
+    const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-cpu-scene]');
+    if (canvases.length === 0 || !canRender()) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try {
+      const [{ startCpu }, { themeColorHex }] = await Promise.all([
+        import('../gfx/cpu'),
+        import('../gfx/cssColor'),
+      ]);
+      const headingFont =
+        getComputedStyle(document.documentElement).getPropertyValue('--font-heading').trim() ||
+        'sans-serif';
+      try {
+        await document.fonts.load(`800 118px ${headingFont}`);
+      } catch {
+        // The fallback font is fine for etched text.
+      }
+      for (const canvas of canvases) {
+        const handle = await startCpu(canvas, {
+          reducedMotion,
+          accent: themeColorHex('--color-accent', '#a9d5b5'),
+          headingFont,
+          text: ['Pavel Marek', 'akirathan.dev', 'Brno · Czechia'],
+        });
+        handles.push(handle);
+        canvas.dataset.ready = '';
+      }
+    } catch (error) {
+      console.warn('CPU scene disabled:', error);
+    }
+  };
+
+  const schedule = () => {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => void start(), { timeout: 2000 });
+    } else {
+      setTimeout(() => void start(), 500);
+    }
+  };
+
+  document.addEventListener('astro:page-load', schedule);
+  document.addEventListener('astro:before-swap', () => {
+    for (const handle of handles) handle.dispose();
+    handles = [];
+  });
+</script>

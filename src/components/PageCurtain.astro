@@ -18,29 +18,13 @@
 
 <script>
   import type { PageCurtainHandle } from '../gfx/pageCurtain';
+  import { cssColorToHex } from '../gfx/cssColor';
 
   const canRender = () =>
     'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let curtain: PageCurtainHandle | null = null;
-
-  /**
-   * Resolves a CSS colour (the theme uses oklch(), which THREE.Color cannot parse) to a hex
-   * string through a 2D canvas.
-   */
-  const cssColorToHex = (cssColor: string, fallback: string) => {
-    try {
-      const ctx = document.createElement('canvas').getContext('2d');
-      if (!ctx) return fallback;
-      ctx.fillStyle = cssColor;
-      ctx.fillRect(0, 0, 1, 1);
-      const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-      return `#${[r, g, b].map((c) => c!.toString(16).padStart(2, '0')).join('')}`;
-    } catch {
-      return fallback;
-    }
-  };
 
   const init = async () => {
     const canvas = document.getElementById('page-curtain') as HTMLCanvasElement | null;
