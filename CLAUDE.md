@@ -58,6 +58,7 @@ these local runs are the only check.
 ## Structure
 
 ```text
+cad/                 FeatureScript sources of CAD models (Onshape); see below
 public/              static files copied as-is (favicon, CNAME)
 src/
   pages/             routes (file-based routing)
@@ -76,6 +77,12 @@ tag fails the build (`skillByLabel` throws). A skill gets a long-form note by ad
 `src/content/skills/<slug>.mdx`: the chip then links to `/skills/<slug>` from everywhere. A
 skill gets an icon by adding `src/assets/skills/<slug>.png` (256 px, transparent; official
 logos only). A note whose file name matches no slug fails the build.
+
+`cad/*.fs` is the source of truth for custom features in the owner's Onshape documents.
+FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP server
+(`test_feature`, one API call per run, from a yearly allocation of 2 500), then the owner pastes
+the file into the Feature Studio by hand and exports glTF from the Part Studio. Do not spend
+API calls on bookkeeping tools when a test is all that is needed.
 
 ## Conventions
 
