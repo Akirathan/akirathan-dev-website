@@ -1,0 +1,51 @@
+---
+import { getCollection, render } from 'astro:content';
+import ArticleLayout from '../../layouts/ArticleLayout.astro';
+import { skillCategoryOf, skillHref, skillIcon, skills } from '../../data/skills';
+import { usedAtBySkill } from '../../data/skillContent';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('skills');
+  return entries.map((entry) => {
+    const skill = skills.find((s) => s.slug === entry.id);
+    if (!skill) {
+      throw new Error(
+        `src/content/skills/${entry.id}.mdx has no skill with slug "${entry.id}" in src/data/skills.ts.`,
+      );
+    }
+    return { params: { slug: entry.id }, props: { entry, skill } };
+  });
+}
+
+const { entry, skill } = Astro.props;
+const { Content } = await render(entry);
+const tagline = entry.data.tagline ?? skill.note;
+const jobs = (await usedAtBySkill()).get(skill.slug) ?? [];
+---
+
+<ArticleLayout
+  title={skill.label}
+  description={tagline ?? `${skill.label}: notes by Pavel Marek.`}
+  eyebrow={skillCategoryOf(skill).title}
+  meta={tagline}
+  icon={skillIcon(skill)}
+  backHref={skillHref(skill)}
+  backLabel="All skills"
+>
+  <Fragment slot="header">
+    {jobs.length > 0 && (
+      <p class="mt-3 text-sm text-muted">
+        Used at{' '}
+        {jobs.map((job, i) => (
+          <>
+            <a href={`/work/${job.id}`} class="text-paper/80 hover:text-accent hover:underline">
+              {job.company}
+            </a>
+            {i < jobs.length - 1 ? ', ' : '.'}
+          </>
+        ))}
+      </p>
+    )}
+  </Fragment>
+  <Content />
+</ArticleLayout>

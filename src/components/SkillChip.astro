@@ -1,9 +1,14 @@
 ---
-import { skillHref, type Skill } from '../data/skills';
+import { Image } from 'astro:assets';
+import { skillArticleHref, skillHref, skillIcon, type Skill } from '../data/skills';
+import { hasArticle } from '../data/skillContent';
 
 /**
- * A skill keyword as a chip. Links to its place on /skills, or, on /skills itself, is the
- * link target (`target` prop) and highlights when addressed by the URL fragment.
+ * A skill keyword as a chip, with the skill's icon when one exists.
+ *
+ * A skill with a note in `src/content/skills/` links to that note from everywhere. Without a
+ * note, the chip links to its place on /skills; on /skills itself (`target` prop) it is the
+ * link target and highlights when addressed by the URL fragment.
  */
 interface Props {
   skill: Skill;
@@ -12,27 +17,51 @@ interface Props {
 }
 
 const { skill, target = false, size = 'sm' } = Astro.props;
+const article = await hasArticle(skill);
+const icon = skillIcon(skill);
+
+const base = 'inline-flex items-center gap-1.5 rounded-full border transition-colors';
 const sizeClass = size === 'md' ? 'px-4 py-1.5 text-sm' : 'px-3 py-1 text-xs';
+const iconClass = size === 'md' ? '-ml-1.5 size-5' : '-ml-1 size-4';
+const highlight = 'target:border-accent target:bg-accent/15 target:text-paper';
 ---
 
-{target ? (
-  <span
-    id={skill.slug}
+{article ? (
+  <a
+    id={target ? skill.slug : undefined}
+    href={skillArticleHref(skill)}
     class:list={[
-      'inline-block scroll-mt-28 rounded-full border border-paper/15 text-paper/85 transition-colors target:border-accent target:bg-accent/15 target:text-paper',
+      base,
       sizeClass,
+      target && 'scroll-mt-28',
+      target && highlight,
+      'border-paper/25 text-paper/90 hover:border-accent hover:bg-accent/10 hover:text-paper',
     ]}
   >
+    {icon && <Image src={icon} alt="" width={40} height={40} class={iconClass} />}
+    {skill.label}
+    <span aria-hidden="true" class="-mr-1 text-accent">
+      →
+    </span>
+  </a>
+) : target ? (
+  <span
+    id={skill.slug}
+    class:list={[base, sizeClass, 'scroll-mt-28 border-paper/15 text-paper/85', highlight]}
+  >
+    {icon && <Image src={icon} alt="" width={40} height={40} class={iconClass} />}
     {skill.label}
   </span>
 ) : (
   <a
     href={skillHref(skill)}
     class:list={[
-      'inline-block rounded-full border border-paper/15 text-muted transition-colors hover:border-accent/60 hover:text-paper',
+      base,
       sizeClass,
+      'border-paper/15 text-muted hover:border-accent/60 hover:text-paper',
     ]}
   >
+    {icon && <Image src={icon} alt="" width={40} height={40} class={iconClass} />}
     {skill.label}
   </a>
 )}

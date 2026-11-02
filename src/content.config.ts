@@ -35,4 +35,18 @@ const topics = defineCollection({
   }),
 });
 
-export const collections = { experience, topics };
+/**
+ * Long-form notes on single skills. The file name is the skill slug from `src/data/skills.ts`
+ * (`java.mdx` for `/skills/java`); a file without a matching skill fails the build. A skill with
+ * a note here becomes a clickable chip everywhere.
+ */
+const skills = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/skills' }),
+  schema: z.object({
+    /** One line under the title. Falls back to the skill's `note`. */
+    tagline: z.string().optional(),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { experience, topics, skills };

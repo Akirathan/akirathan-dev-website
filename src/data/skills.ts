@@ -7,7 +7,10 @@
  */
 export interface Skill {
   label: string;
-  /** URL fragment on /skills, e.g. `/skills#java`. */
+  /**
+   * URL fragment on /skills (`/skills#java`), the file name of an optional note in
+   * `src/content/skills/`, and of an optional icon in `src/assets/skills/`.
+   */
   slug: string;
   /** One short line, optional. */
   note?: string;
@@ -91,4 +94,23 @@ export function skillByLabel(label: string): Skill {
   return skill;
 }
 
+/** The chip's place on the keywords page. */
 export const skillHref = (skill: Skill) => `/skills#${skill.slug}`;
+
+/** The long-form note, if `src/content/skills/<slug>.mdx` exists. */
+export const skillArticleHref = (skill: Skill) => `/skills/${skill.slug}`;
+
+export function skillCategoryOf(skill: Skill): SkillCategory {
+  return skillCategories.find((c) => c.skills.includes(skill))!;
+}
+
+// Icons are PNG files named after the slug. Only some skills have one (official logos exist
+// for languages; most tools do not need one).
+const icons = import.meta.glob<ImageMetadata>('../assets/skills/*.png', {
+  eager: true,
+  import: 'default',
+});
+
+export function skillIcon(skill: Skill): ImageMetadata | undefined {
+  return icons[`../assets/skills/${skill.slug}.png`];
+}

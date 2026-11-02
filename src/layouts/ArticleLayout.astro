@@ -1,4 +1,5 @@
 ---
+import { Image } from 'astro:assets';
 import BaseLayout from './BaseLayout.astro';
 
 interface Props {
@@ -6,11 +7,13 @@ interface Props {
   description: string;
   eyebrow?: string;
   meta?: string;
+  /** Shown next to the title (a logo, for example). */
+  icon?: ImageMetadata;
   backHref: string;
   backLabel: string;
 }
 
-const { title, description, eyebrow, meta, backHref, backLabel } = Astro.props;
+const { title, description, eyebrow, meta, icon, backHref, backLabel } = Astro.props;
 ---
 
 <BaseLayout title={`${title} · Pavel Marek`} description={description}>
@@ -26,7 +29,10 @@ const { title, description, eyebrow, meta, backHref, backLabel } = Astro.props;
       {eyebrow && (
         <p class="text-xs font-medium tracking-widest text-accent uppercase">{eyebrow}</p>
       )}
-      <h1 class="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">{title}</h1>
+      <div class="mt-2 flex items-center gap-4">
+        {icon && <Image src={icon} alt="" width={128} height={128} class="size-12 sm:size-16" />}
+        <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">{title}</h1>
+      </div>
       {meta && <p class="mt-3 text-muted">{meta}</p>}
       <slot name="header" />
     </header>

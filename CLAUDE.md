@@ -64,14 +64,18 @@ src/
   layouts/           page shells; BaseLayout.astro holds <head>, meta, global CSS
   components/        Astro components (and framework islands, if one is added)
   styles/global.css  Tailwind import, @theme tokens, base layer
-  content/           MDX articles (experience/, topics/), validated by src/content.config.ts
+  assets/            images imported by components; assets/skills/<slug>.png = skill icons
+  content/           MDX articles (experience/, topics/, skills/), validated by src/content.config.ts
   data/skills.ts     skills as keywords; experience tags must match a skill label exactly
   gfx/               Three.js / shader code, loaded lazily on the client
 ```
 
 `/skills` lists every skill as a chip (`SkillChip.astro`) grouped by category, with the work
 entries that use it. Experience tags render as chips that link to `/skills#<slug>`; an unknown
-tag fails the build (`skillByLabel` throws).
+tag fails the build (`skillByLabel` throws). A skill gets a long-form note by adding
+`src/content/skills/<slug>.mdx`: the chip then links to `/skills/<slug>` from everywhere. A
+skill gets an icon by adding `src/assets/skills/<slug>.png` (256 px, transparent; official
+logos only). A note whose file name matches no slug fails the build.
 
 ## Conventions
 
