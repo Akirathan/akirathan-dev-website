@@ -194,14 +194,14 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
 
         // --- Traces: gold fan-out lines on the substrate, like the wiring of a real package. ---
         // A ring sits half under the lid edge. On each side, traces leave the ring outwards,
-        // jog by 45 degrees so that they spread out, and end in a round pad near the package
-        // edge. Every piece touches the ring, so the union gives one part.
+        // jog by 45 degrees so that they spread out, and run flush to the substrate edge, where
+        // the web page can continue them. Each trace is one mitred polygon in a sketch; all are
+        // extruded together and joined with the ring into one part.
         if (definition.hasTraces)
         {
             const w = definition.traceWidth;
             const h = 0.08 * millimeter;
             const tid = id + "traces";
-            const zAxis = line(vector(zero, zero, zero), vector(0, 0, 1));
 
             const ringWidth = 0.6 * millimeter;
             const ringInner = lidHalf - ringWidth / 2;
@@ -215,63 +215,44 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
             const fan = definition.traceFan;
             const uStart = ringOuter - w;                   // overlaps the ring
             const uBend = ringOuter + 0.8 * millimeter;     // where the jog starts
-            const uEnd = half - 1.5 * millimeter;           // pad centre
+            const uEnd = half;                              // flush with the substrate edge
             const vSpan = lidHalf * 0.8;                    // lateral spread at the ring
-            const padRadius = w * 1.5;
 
-            // Each side is built along +X (u outwards, v sideways), then turned into place.
+            // Each trace is drawn along +X (u outwards, v sideways), then turned to its side.
+            const sketch = newSketchOnPlane(context, tid + "sketch", {
+                    "sketchPlane" : plane(vector(zero, zero, zero), vector(0, 0, 1))
+            });
             for (var side = 0; side < 4; side += 1)
             {
-                const sideId = tid + ("side" ~ side);
                 for (var k = 0; k < count; k += 1)
                 {
                     const f = count == 1 ? 0 : (k / (count - 1)) * 2 - 1;   // -1 .. 1 along the side
-                    const v0 = f * vSpan;
-                    const jog = f * fan;
-                    const v1 = v0 + jog;
-                    const uAfter = uBend + abs(jog);
-                    const kId = sideId + ("t" ~ k);
-
-                    // Ring to bend.
-                    fCuboid(context, kId + "a", {
-                            "corner1" : vector(uStart, v0 - w / 2, zero),
-                            "corner2" : vector(uBend + w / 2, v0 + w / 2, h)
-                    });
-                    // The 45 degree jog: a bar built at the origin, then turned and moved.
-                    if (abs(jog) > w / 4)
-                    {
-                        const diagonal = abs(jog) * sqrt(2) + w;
-                        fCuboid(context, kId + "b", {
-                                "corner1" : vector(-diagonal / 2, -w / 2, zero),
-                                "corner2" : vector(diagonal / 2, w / 2, h)
-                        });
-                        const angle = (jog > zero ? 45 : -45) * degree;
-                        const centre = vector((uBend + uAfter) / 2, (v0 + v1) / 2, zero);
-                        opTransform(context, kId + "bMove", {
-                                "bodies" : qCreatedBy(kId + "b", EntityType.BODY),
-                                "transform" : transform(centre) * rotationAround(zAxis, angle)
-                        });
-                    }
-                    // Bend to pad.
-                    fCuboid(context, kId + "c", {
-                            "corner1" : vector(uAfter - w / 2, v1 - w / 2, zero),
-                            "corner2" : vector(uEnd, v1 + w / 2, h)
-                    });
-                    fCylinder(context, kId + "pad", {
-                            "topCenter" : vector(uEnd, v1, h),
-                            "bottomCenter" : vector(uEnd, v1, zero),
-                            "radius" : padRadius
-                    });
-                }
-                if (side > 0)
-                {
-                    opTransform(context, sideId + "turn", {
-                            "bodies" : qCreatedBy(sideId, EntityType.BODY),
-                            "transform" : rotationAround(zAxis, side * 90 * degree)
-                    });
+                    const outline = traceOutline(uStart, uBend, uEnd, f * vSpan, f * fan, w);
+                    var points = [];
+                    for (var corner in outline)
+                        points = append(points, turnToSide(corner, side));
+                    points = append(points, points[0]);
+                    skPolyline(sketch, "trace" ~ side ~ "_" ~ k, { "points" : points });
                 }
             }
-            const traceBodies = qCreatedBy(tid, EntityType.BODY);
+            skSolve(sketch);
+            opExtrude(context, tid + "extrude", {
+                    "entities" : qSketchRegion(tid + "sketch"),
+                    "direction" : vector(0, 0, 1),
+                    "endBound" : BoundingType.BLIND,
+                    "endDepth" : h
+            });
+            opDeleteBodies(context, tid + "deleteSketch", {
+                    "entities" : qCreatedBy(tid + "sketch", EntityType.BODY)
+            });
+
+            const traceBodies = qUnion([
+                        qCreatedBy(tid + "ringE", EntityType.BODY),
+                        qCreatedBy(tid + "ringW", EntityType.BODY),
+                        qCreatedBy(tid + "ringN", EntityType.BODY),
+                        qCreatedBy(tid + "ringS", EntityType.BODY),
+                        qCreatedBy(tid + "extrude", EntityType.BODY)
+                    ]);
             opBoolean(context, tid + "union", {
                     "tools" : traceBodies,
                     "operationType" : BooleanOperationType.UNION
@@ -335,6 +316,49 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
         capsPerEdge : 7,
         capLength : 2 * millimeter
     });
+
+/**
+ * Outline of one trace as a closed polygon, counter-clockwise, in a side's local frame:
+ * u runs outwards from the lid, v runs along the side. The centre line goes straight from
+ * uStart to uBend, then 45 degrees sideways by `jog`, then straight to uEnd. Corners at the
+ * two bends are mitred, so the sides of the trace stay parallel through the bend.
+ */
+function traceOutline(uStart, uBend, uEnd, v0, jog, w)
+{
+    const halfW = w / 2;
+    if (abs(jog) < w / 4)
+    {
+        return [vector(uStart, v0 - halfW), vector(uEnd, v0 - halfW),
+                vector(uEnd, v0 + halfW), vector(uStart, v0 + halfW)];
+    }
+    const s = jog > 0 * meter ? 1 : -1;
+    const v1 = v0 + jog;
+    const uAfter = uBend + abs(jog);
+    const p0 = vector(uStart, v0);
+    const p1 = vector(uBend, v0);
+    const p2 = vector(uAfter, v1);
+    const p3 = vector(uEnd, v1);
+    // Left normals of the straight legs (n0) and of the diagonal leg (n1); the mitre offset
+    // at a bend is the sum of the two normals, scaled so that the width stays w.
+    const n0 = vector(0, 1);
+    const n1 = vector(-s, 1) / sqrt(2);
+    const edge = n0 * halfW;
+    const mitre = (n0 + n1) * (halfW / (1 + 1 / sqrt(2)));
+    return [p0 + edge, p1 + mitre, p2 + mitre, p3 + edge,
+            p3 - edge, p2 - mitre, p1 - mitre, p0 - edge];
+}
+
+/** Turns a 2D point from the +X side's frame to the given side (0 = +X, 1 = +Y, 2 = -X, 3 = -Y). */
+function turnToSide(p, side)
+{
+    if (side == 1)
+        return vector(-p[1], p[0]);
+    if (side == 2)
+        return vector(-p[0], -p[1]);
+    if (side == 3)
+        return vector(p[1], -p[0]);
+    return p;
+}
 
 /** Gives a body a part name and an appearance colour. */
 function namePart(context is Context, body is Query, name is string, appearance is Color)
