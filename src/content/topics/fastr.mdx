@@ -1,0 +1,71 @@
+---
+title: FastR
+tagline: ???
+order: ???
+summary:
+draft: true
+---
+
+# FastR
+
+An alternative [R programming language](??) interpreter backed by [Oracle Labs](???).
+Since around 2022, transitioned to a maintenance mode.
+An unfortunate, but expectable event, based on the recent decade of hype and migration of many data-analysis workflows to [Python](???).
+
+How do you measure compatibility with the *referential implementation*?
+An official *Test Compatibility Kit* (TCK) is a nice start, if it is provided.
+But that only covers the language syntax and semantics.
+For some languages, like [ECMA script](??) or [Lua](??) it is almost enough, as they don't really have a standard library and most importantly, they don't have **native extensions**.
+Despite the popular understanding, the most difficult part of implementing an alternative programming language interpreter is not to re-implement its semantics, standard library, or various optimizations, it is to ensure that all the *native extensions* are compatible.
+
+## Native extensions
+
+A *native extension* is a library / package that binds the language to a native code like C or C++.
+They use the native code internally.
+
+### data-table example
+[data-table](https://r-datatable.com/) is a native extension (a library) for R.
+It is basically a re-implementation of the built-in [data.frame](???) that promises more features and speed.
+To achieve these goals, the authors of `data-table` (ab)used the knowledge of internal memory representation of R objects.
+Every object in R is just a *vector*, with two parts: a header part and a data part.
+Internally, GNU-R (the referential implementation):
+- uses exactly `n` bytes for header,
+- the data part immediately follows the header part in the memory.
+
+So in order to get to the data part of the object, instead of using the officially provided
+[Rf_data](??) function, the `data-table` authors do a pointer arithmetics, which is perfectly legal in C.
+
+This imposes a big problem to anybody wishing to contribute an alternative R implementation that should support `data-table`: they need to ensure that whenever somebody
+is doing something like:
+```C
+uint_32t *ptr = ...;
+*(ptr + 9) = (byte) 42;
+```
+, you need to write value `42` as a first element of the vector pointed to by `ptr`.
+
+### Stop-the-world garbage collector
+GNU-R is single threaded with sequential, reference counting, [stop-the-world garbage collector](???).
+Whenever you allocate a new object in the native code, you are supposed to call [PROTECT](???) function which bumps the GC reference count.
+In other words, in:
+```C
+SEXP *obj = allocVector(...);
+PROTECT(obj);
+```
+the `PROTECT(obj)` ensures that `obj` will not be garbage collected.
+
+There is nothing ensuring that this contract holds.
+No enforced linter, no runtime error.
+So over the time, authors (I assume by a mistake) just allocated and used objects without bumping their reference count.
+Their library worked, because the only place where a garbage collector is called is from another allocation.
+So in GNU-R, the following snippet is perfectly safe:
+```C
+SEXP *obj = allocVector(...);
+do_some_computation(obj);
+```
+as long as in `do_some_computation` there is not another `allocVector`.
+
+This imposes yet another problem for alternative R implementations, as we have to ensure that such objects
+are not garbage collected, even though they *should be* according to the semantics.
+
+
+

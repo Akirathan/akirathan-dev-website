@@ -1,0 +1,75 @@
+---
+title: Shopify
+tagline: ???
+order: ???
+summary:
+  - Why have I chosen Shopify as the platform for our commerce?
+  - How am I customizing frontend and backend.
+draft: true
+---
+
+Disclaimer: I am not affiliated with Shopify in any way, other than I am a subscribed user of Shopify.
+In this article, I am merely describing my experience with the Shopify platform from the perspective of SW engineer.
+
+Previously, we hosted our entire e-commerce on [Shoptet](???) (A Czech-only e-commerce platform).
+While Shoptet provides some advantages for Czech-only stores, like tight integration with local carriers, it kinda sucks:
+They are trying to be a small clone of Shopify and IMHO, they are not doing a great job in that regard -
+less features than Shopify, same price, no API access, terrible admin UI.
+The fact that they are charging roughly the same price as Shopify for like 15% of Shopify's functionality made a strong case to migrate.
+
+For starters, I was surprised by the amount of possible customizations to the frontend of your store.
+For a normal, non SW engineer, user, there are dozens of high quality themes (both free and paid) with a lot of customization options.
+On top of that, you can create your own UI blocks with the help of Shopify's built-in AI *sidekick*.
+For an SW engineer, it is even better.
+You can create your own theme from scratch using the [Liquid](???) templating language, and connect it to a GH repo so that you don't even have to care about deployment -
+a push to a particular branch just deploys.
+Shopify even supports a [headless](https://shopify.dev/docs/storefronts/headless/overview) deployment: You can create the entire store via [Hydrogen](??) (a headless toolkit with optional React or Vue bindings) or with your own stack using just the Client API.
+I have initially considered the headless way, but discarded it because:
+- Liquid seemed to fulfill all my requirements.
+- Shopify apps (plugins from their marketplace) do not work on headless stores.
+
+## Customizing frontend
+As mentioned earlier, I like Shopify because it lets you customize *almost* the entire UI.
+The only exception is the [Checkout page](??) and the [Account page](??).
+You cannot change the structure of those pages, you can only add custom application blocks there.
+And the blocks are [sandboxed](???), which seems reasonable from the safety perspective.
+Moreover, you can only add custom application blocks to the checkout page if you are Shopify Plus subscriber ($ 2.5k per month).
+
+### Liquid
+[Liquid](???) is a custom templating language developed by Shopify.
+It uses mustache syntax and its filter functions are obviously inspired by Ruby.
+
+- You have almost full control over the HTML / CSS / JS that is loaded in the browser.
+- Pretty good developer experience:
+  - Decent documentation
+  - CLI that provides local CDN proxy, so you can immediately see your changes.
+
+One big downside is that if you run `shopify theme dev` from multiple worktrees, only the files from the first worktree are served.
+So if you have multiple agents running in multiple worktrees, expect some clashes.
+
+### VueJS embeddings
+For more interactive parts of the website, I have decided to use embedded [VueJS](???) applications.
+The alternatives were [ReactJS](???) and [Lit](???) (lightweight components based on [Web components](???)).
+- The base VueJS runtime is smaller than ReactJS.
+- I simply prefer VueJS to ReactJS.
+- I find Lit's syntax and semantics more complex than Vue components.
+
+Of course, you have to be careful to properly *lazy load* all those VueJS applications.
+
+## Customizing backend
+Pretty much the only way how to customize the behavior of the backend is via [Shopify Flow](???).
+It is not bad, but it has its disadvantages:
+- The *workflows* (functions in Flow) cannot be accessed via API - so you are not able to modify them with your own agents.
+- There is no central log of all the workflow runs. If you are debugging what wen wrong, you have to click through each failed workflow run.
+
+Luckily, there is still the [Admin GraphQL API](???) and [webhooks](???).
+So in my case, all the custom functionality of the backend are handled from what I like to call the **Companion app** -
+a NuxtJS application hosted on a VM.
+The companion app simply receives various webhooks from Shopify, like order creation, order payment, or product change,
+and does various modifications on Shopify's objects in reaction - adding some [metafields](???) to orders,
+changing product variants, etc.
+This solution has many advantages:
+- Pretty simple - you just need Admin API access and webhooks.
+- You have full control over the reads and modifications.
+- You have full access to the logs.
+

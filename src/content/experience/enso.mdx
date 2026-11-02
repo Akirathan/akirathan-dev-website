@@ -12,6 +12,8 @@ tags: [Java, Scala, GraalVM, Truffle, Native Image, JPMS, Compilers]
 links:
   - label: enso-org/enso on GitHub
     url: https://github.com/enso-org/enso
+  - label: Enso landing page
+    url: https://ensoanalytics.com
 ---
 
 For more than three years I worked on the design and implementation of Enso's language engine,
@@ -34,3 +36,53 @@ work covers the full pipeline, and all of it is open source in Enso's public Git
   Kraków 2024.
 - **Language design.** Designed and implemented two language features: the `private` keyword for
   proper encapsulation, and the semantics of equality, hashing, and comparators.
+
+### Native image
+[GraalVM Native Image](???) (nowadays usually called just *GraalVM*) is an ahead-of-time (AOT) compiler for Java.
+More specifically, as an input, it takes JVM bytecode, and as an output, it provides a standalone native code binary.
+It is an impressive piece of technology, as it allows to run Java code with very fast startup time and low memory usage.
+
+My former colleague, [Jaroslav Tulach](???), presents a talk at various conferences with a catchy name - [Forget Go. Go, Java, go!](???).
+In that talk, he explains that a native binary produced by the Native Image has a similar properties to the binary produced by the Go compiler:
+- Fast startup.
+- Low memory footprint.
+- Memory safety - both have a garbage collector.
+- Similar size of the binary.
+- Similar speed of the executed code.
+
+In theory, Native Image looks great. But in practice, there are some non-trivial drawbacks:
+
+1. Java is still a *dynamic language*.
+It allows you to load new classes at runtime and to reflectively access their fields, among other things.
+To keep the AOT generated binary small, Native Image has to strip the class information from the binary.
+Which means that reflection, or a class load triggers a runtime error.
+There is a workaround for that though: Execute the program in the JVM mode with a [tracing agent](???) that records all reflections and class loads into a bunch of JSON metadata files, that can later be used by the Native Image to selectively allow those dynamic features for some classes.
+
+So adding Native Image compilation to your Java project may not be for free.
+Especially, if your project is using a lot of these problematic dynamic features.
+
+I still have to give a big shoutout to the Native Image team as they are spending a lot of time to ensure that usage of the Native Image is as smooth as possible:
+- Runtime errors usually have a pretty descriptive messages.
+- They have provided a lot of the aforementioned metadata to some of the most popular 3rd party Java libraries, like [Spring boot](???), [Micronaut](???), etc.
+
+2. Building of Native Image is slow, and consumes a lot of resources.
+By a lot of resources, I mean a lot of resources - Rust compilation may seem like a super fast and resource free process compare to it.
+Building Native Image of [Enso](???) takes cca 4 minutes on Mac M4 Pro with CPU load converging to 100% and consumes as much as 16 GB of memory.
+We have encountered a lot of out of memory errors on our CI.
+That is not a bug, but rather an inherent drawback of how Native Image works - during building, it holds the entire control flow graph (all the places that are reachable from the entry point) in the memory.
+Which also means, that whenever you change just a single line of code, the entire Native Image has to be built from scratch.
+
+However, the intended use of Native Image is not building it locally every time.
+Locally, you develop and debug your application in the JVM mode.
+Once everything works, the Native Image should ideally be built just once for every platform on the CI and deployed.
+This leads to the last drawback.
+
+3. AOT is yet another runtime mode.
+And strictly speaking, AOT mode and JVM mode can run into different paths.
+You can even branch your own code based on the mode of execution with the [AOT.isNativeMode](???) method call.
+So ideally, you should test your application in AOT mode, not only in JVM mode.
+
+The impact of this is also yet another complication to now already complicated JVM build tools.
+Ideally, though, Native Image compilation should be as simple as a [Gradle plugin](??) or a [Maven plugin](??) with a bit of custom modifications.
+
+
