@@ -52,6 +52,20 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
                 isLength(definition.pinLength, { (millimeter) : [0.5, 3, 12] } as LengthBoundSpec);
             }
         }
+        annotation { "Group Name" : "Traces", "Collapsed By Default" : false }
+        {
+            annotation { "Name" : "Traces" }
+            definition.hasTraces is boolean;
+            if (definition.hasTraces)
+            {
+                annotation { "Name" : "Traces per side" }
+                isInteger(definition.tracesPerSide, { (unitless) : [1, 14, 60] } as IntegerBoundSpec);
+                annotation { "Name" : "Trace width" }
+                isLength(definition.traceWidth, { (millimeter) : [0.05, 0.3, 2] } as LengthBoundSpec);
+                annotation { "Name" : "Fan-out" }
+                isLength(definition.traceFan, { (millimeter) : [0, 2.5, 10] } as LengthBoundSpec);
+            }
+        }
         annotation { "Group Name" : "Capacitors", "Collapsed By Default" : false }
         {
             annotation { "Name" : "Capacitors" }
@@ -166,15 +180,103 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
                     "corner1" : vector(-carrierHalf, -carrierHalf, -thickness - carrierThickness),
                     "corner2" : vector(carrierHalf, carrierHalf, -thickness)
             });
+            const pinBodies = qUnion([
+                        qCreatedBy(id + "carrier", EntityType.BODY),
+                        qCreatedBy(id + "pin", EntityType.BODY),
+                        qCreatedBy(id + "pinPattern", EntityType.BODY)
+                    ]);
             opBoolean(context, id + "pinUnion", {
-                    "tools" : qUnion([
-                                qCreatedBy(id + "carrier", EntityType.BODY),
-                                qCreatedBy(id + "pin", EntityType.BODY),
-                                qCreatedBy(id + "pinPattern", EntityType.BODY)
-                            ]),
+                    "tools" : pinBodies,
                     "operationType" : BooleanOperationType.UNION
             });
-            namePart(context, qCreatedBy(id + "carrier", EntityType.BODY), "Pins", color(0.82, 0.66, 0.31));
+            namePart(context, pinBodies, "Pins", color(0.82, 0.66, 0.31));
+        }
+
+        // --- Traces: gold fan-out lines on the substrate, like the wiring of a real package. ---
+        // A ring sits half under the lid edge. On each side, traces leave the ring outwards,
+        // jog by 45 degrees so that they spread out, and end in a round pad near the package
+        // edge. Every piece touches the ring, so the union gives one part.
+        if (definition.hasTraces)
+        {
+            const w = definition.traceWidth;
+            const h = 0.08 * millimeter;
+            const tid = id + "traces";
+            const zAxis = line(vector(zero, zero, zero), vector(0, 0, 1));
+
+            const ringWidth = 0.6 * millimeter;
+            const ringInner = lidHalf - ringWidth / 2;
+            const ringOuter = lidHalf + ringWidth / 2;
+            fCuboid(context, tid + "ringE", { "corner1" : vector(ringInner, -ringOuter, zero), "corner2" : vector(ringOuter, ringOuter, h) });
+            fCuboid(context, tid + "ringW", { "corner1" : vector(-ringOuter, -ringOuter, zero), "corner2" : vector(-ringInner, ringOuter, h) });
+            fCuboid(context, tid + "ringN", { "corner1" : vector(-ringOuter, ringInner, zero), "corner2" : vector(ringOuter, ringOuter, h) });
+            fCuboid(context, tid + "ringS", { "corner1" : vector(-ringOuter, -ringOuter, zero), "corner2" : vector(ringOuter, -ringInner, h) });
+
+            const count = definition.tracesPerSide;
+            const fan = definition.traceFan;
+            const uStart = ringOuter - w;                   // overlaps the ring
+            const uBend = ringOuter + 0.8 * millimeter;     // where the jog starts
+            const uEnd = half - 1.5 * millimeter;           // pad centre
+            const vSpan = lidHalf * 0.8;                    // lateral spread at the ring
+            const padRadius = w * 1.5;
+
+            // Each side is built along +X (u outwards, v sideways), then turned into place.
+            for (var side = 0; side < 4; side += 1)
+            {
+                const sideId = tid + ("side" ~ side);
+                for (var k = 0; k < count; k += 1)
+                {
+                    const f = count == 1 ? 0 : (k / (count - 1)) * 2 - 1;   // -1 .. 1 along the side
+                    const v0 = f * vSpan;
+                    const jog = f * fan;
+                    const v1 = v0 + jog;
+                    const uAfter = uBend + abs(jog);
+                    const kId = sideId + ("t" ~ k);
+
+                    // Ring to bend.
+                    fCuboid(context, kId + "a", {
+                            "corner1" : vector(uStart, v0 - w / 2, zero),
+                            "corner2" : vector(uBend + w / 2, v0 + w / 2, h)
+                    });
+                    // The 45 degree jog: a bar built at the origin, then turned and moved.
+                    if (abs(jog) > w / 4)
+                    {
+                        const diagonal = abs(jog) * sqrt(2) + w;
+                        fCuboid(context, kId + "b", {
+                                "corner1" : vector(-diagonal / 2, -w / 2, zero),
+                                "corner2" : vector(diagonal / 2, w / 2, h)
+                        });
+                        const angle = (jog > zero ? 45 : -45) * degree;
+                        const centre = vector((uBend + uAfter) / 2, (v0 + v1) / 2, zero);
+                        opTransform(context, kId + "bMove", {
+                                "bodies" : qCreatedBy(kId + "b", EntityType.BODY),
+                                "transform" : transform(centre) * rotationAround(zAxis, angle)
+                        });
+                    }
+                    // Bend to pad.
+                    fCuboid(context, kId + "c", {
+                            "corner1" : vector(uAfter - w / 2, v1 - w / 2, zero),
+                            "corner2" : vector(uEnd, v1 + w / 2, h)
+                    });
+                    fCylinder(context, kId + "pad", {
+                            "topCenter" : vector(uEnd, v1, h),
+                            "bottomCenter" : vector(uEnd, v1, zero),
+                            "radius" : padRadius
+                    });
+                }
+                if (side > 0)
+                {
+                    opTransform(context, sideId + "turn", {
+                            "bodies" : qCreatedBy(sideId, EntityType.BODY),
+                            "transform" : rotationAround(zAxis, side * 90 * degree)
+                    });
+                }
+            }
+            const traceBodies = qCreatedBy(tid, EntityType.BODY);
+            opBoolean(context, tid + "union", {
+                    "tools" : traceBodies,
+                    "operationType" : BooleanOperationType.UNION
+            });
+            namePart(context, traceBodies, "Traces", color(0.85, 0.7, 0.35));
         }
 
         // --- Capacitors: a row along each edge of the lid, lying on the substrate. ---------
@@ -225,6 +327,10 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
         pinPitch : 1.27 * millimeter,
         pinDiameter : 0.35 * millimeter,
         pinLength : 3 * millimeter,
+        hasTraces : true,
+        tracesPerSide : 14,
+        traceWidth : 0.3 * millimeter,
+        traceFan : 2.5 * millimeter,
         hasCapacitors : true,
         capsPerEdge : 7,
         capLength : 2 * millimeter
