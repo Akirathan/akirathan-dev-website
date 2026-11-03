@@ -10,6 +10,8 @@ import(path : "onshape/std/common.fs", version : "3112.0");
  * Source of truth for the Onshape Feature Studio "CPU Package" in the CPU document. After a
  * change here, paste the whole file into that Feature Studio, then add or regenerate the
  * feature in the Part Studio and export glTF for src/gfx.
+ *
+ * https://cad.onshape.com/documents/39f4e32ac1f0cddc81f3d46d/w/a10f4c91037280df17693ff4/e/68afc16e124aa50e6dbe03f0
  */
 annotation { "Feature Type Name" : "CPU Package",
              "Feature Type Description" : "Parametric CPU package: substrate, pin grid, capacitors, and lid." }
