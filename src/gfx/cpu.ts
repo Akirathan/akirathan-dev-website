@@ -22,12 +22,15 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {
   abs,
+  bumpMap,
   clamp,
+  color,
   float,
   fract,
   instancedBufferAttribute,
   length,
   max,
+  mix,
   normalLocal,
   positionGeometry,
   positionLocal,
@@ -108,6 +111,10 @@ const LID_DROP = 1.3;
 const REST_YAW = 0.6 - Math.PI / 2;
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/cpu.glb`;
+/** Size of one repeat of the weave tile on the substrate, metres (8 cells of 0.4 mm). */
+const WEAVE_TILE = 0.0032;
+/** Copper layers that show as lines on the side faces of the substrate. */
+const LAMINATE_LAYERS = 4;
 
 // ---------------------------------------------------------------------------------------------
 // Shared pieces
@@ -282,6 +289,43 @@ function drawLidTexture(options: CpuOptions): THREE.CanvasTexture {
   return tex;
 }
 
+/**
+ * One repeating tile of the fibreglass weave under the solder mask: a plain weave of light
+ * and dark bundles plus a fine speckle. Grey only; it drives roughness and bump, not colour.
+ */
+function drawWeaveTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const cells = 8;
+  const cell = size / cells;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const image = ctx.createImageData(size, size);
+  const data = image.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = Math.floor(x / cell);
+      const j = Math.floor(y / cell);
+      // Alternate cells carry a horizontal or a vertical bundle; each bundle is rounded,
+      // so its brightness falls off towards the two long edges.
+      const across = (i + j) % 2 === 0 ? (y % cell) / cell : (x % cell) / cell;
+      const bundle = Math.sin(across * Math.PI);
+      const speckle = (Math.random() - 0.5) * 0.18;
+      const value = 0.5 + (bundle - 0.6) * 0.35 + speckle;
+      const byte = Math.round(Math.min(1, Math.max(0, value)) * 255);
+      const k = (y * size + x) * 4;
+      data[k] = data[k + 1] = data[k + 2] = byte;
+      data[k + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  return tex;
+}
+
 /** A UV set from local X and Y, 0..1 across `size`. For CAD meshes, which ship without UVs. */
 function planarUv(geometry: THREE.BufferGeometry, size: number): THREE.BufferAttribute {
   const position = geometry.getAttribute('position');
@@ -310,12 +354,23 @@ function dressModel(
 ): DressedModel {
   const glow = vec3(accent.r, accent.g, accent.b);
 
-  // Substrate: dark green solder mask.
-  const substrate = new THREE.MeshStandardNodeMaterial({
-    color: 0x173029,
-    roughness: 0.5,
-    metalness: 0.05,
-  });
+  // Substrate: a fibreglass laminate under a matte green solder mask. The weave shows through
+  // the mask as grain in the roughness and as a faint bump. The side faces show the laminate
+  // itself: cream glass cloth with the dark lines of the inner copper layers.
+  const weave = drawWeaveTexture();
+  const weaveSample = texture(weave, positionLocal.xy.div(WEAVE_TILE)).r; // 0..1, 0.5 = flat
+  const isSide = abs(normalLocal.z).lessThan(0.3);
+  const maskColor = mix(color(0x142a24), color(0x1b3a30), weaveSample);
+  const layer = fract(positionLocal.z.div(CAD.packageThickness / LAMINATE_LAYERS));
+  const copperLine = smoothstep(0.4, 0.46, abs(layer.sub(0.5))); // thin band at each layer boundary
+  const sideColor = mix(color(0xa89b7c), color(0x55391f), copperLine);
+  const substrate = new THREE.MeshStandardNodeMaterial({ metalness: 0.05 });
+  substrate.colorNode = select(isSide, sideColor, maskColor);
+  substrate.roughnessNode = select(isSide, float(0.7), weaveSample.sub(0.5).mul(0.25).add(0.55));
+  substrate.normalNode = bumpMap(
+    texture(weave, positionLocal.xy.div(WEAVE_TILE)),
+    select(isSide, float(0), float(0.004)),
+  );
   partOf(model, 'Substrate').material = substrate;
 
   // Lid: brushed metal, the printed texture projected on the top face only.
@@ -358,6 +413,7 @@ function dressModel(
     dispose: () => {
       for (const material of [substrate, lid, traces, capacitors]) material.dispose();
       print.dispose();
+      weave.dispose();
       model.traverse((object) => {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });

@@ -90,7 +90,8 @@ CPU model pipeline: the owner exports the Part Studio as glTF to `cad/export/CPU
 `TraceEnd` marker parts, merges primitives, compresses with meshopt, and writes
 `public/models/cpu.glb` (about 60 KB) plus `src/data/cpu-model.json` (trace end points, metres,
 Z up). `src/gfx/cpu.ts` loads the GLB, assigns TSL materials by part name (Substrate, Lid,
-Traces, Capacitors), projects the lid texture from position (CAD meshes have no UVs), and draws
+Traces, Capacitors), projects the lid print and the substrate weave from position (CAD meshes
+have no UVs), and draws
 the pins as one instanced mesh. The `CAD` constant there mirrors the feature's defaults.
 
 ## Conventions
