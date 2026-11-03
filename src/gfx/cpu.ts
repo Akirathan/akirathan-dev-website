@@ -14,7 +14,7 @@
  * meshes have no usable UVs, so textures are projected from local position.
  *
  * Reading guide: `startCpu()` at the bottom wires everything. Materials for the CAD parts are
- * in `dressModel()`, the pins in `makePins()`, and the animation inputs in `Timeline`.
+ * in `dressModel()` and the `*Dressing()` functions above it, the pins in `makePins()`, and the animation inputs in `Timeline`.
  */
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -337,58 +337,59 @@ function planarUv(geometry: THREE.BufferGeometry, size: number): THREE.BufferAtt
   return new THREE.BufferAttribute(uvs, 2);
 }
 
-interface DressedModel {
-  lid: THREE.Mesh;
+/** A material for one CAD part, together with the textures that only it uses. */
+interface Dressing {
+  material: THREE.Material;
   dispose(): void;
 }
 
-/**
- * Replaces the flat CAD colours with the page's materials. All position-based inputs below are
- * in the model's own frame: metres, Z up, origin at the centre of the substrate's top face.
- */
-function dressModel(
-  model: THREE.Group,
-  timeline: Timeline,
-  accent: THREE.Color,
-  options: CpuOptions,
-): DressedModel {
-  const glow = vec3(accent.r, accent.g, accent.b);
+const disposeAll =
+  (...items: { dispose(): void }[]) =>
+  () =>
+    items.forEach((item) => item.dispose());
 
-  // Substrate: a fibreglass laminate under a matte green solder mask. The weave shows through
-  // the mask as grain in the roughness and as a faint bump. The side faces show the laminate
-  // itself: cream glass cloth with the dark lines of the inner copper layers.
+/**
+ * Substrate: a fibreglass laminate under a matte green solder mask. The weave shows through
+ * the mask as grain in the roughness and as a faint bump. The side faces show the laminate
+ * itself: cream glass cloth with the dark lines of the inner copper layers.
+ */
+function substrateDressing(): Dressing {
   const weave = drawWeaveTexture();
-  const weaveSample = texture(weave, positionLocal.xy.div(WEAVE_TILE)).r; // 0..1, 0.5 = flat
+  const weaveUv = positionLocal.xy.div(WEAVE_TILE);
+  const weaveSample = texture(weave, weaveUv).r; // 0..1, 0.5 = flat
   const isSide = abs(normalLocal.z).lessThan(0.3);
+
   const maskColor = mix(color(0x142a24), color(0x1b3a30), weaveSample);
   const layer = fract(positionLocal.z.div(CAD.packageThickness / LAMINATE_LAYERS));
   const copperLine = smoothstep(0.4, 0.46, abs(layer.sub(0.5))); // thin band at each layer boundary
   const sideColor = mix(color(0xa89b7c), color(0x55391f), copperLine);
-  const substrate = new THREE.MeshStandardNodeMaterial({ metalness: 0.05 });
-  substrate.colorNode = select(isSide, sideColor, maskColor);
-  substrate.roughnessNode = select(isSide, float(0.7), weaveSample.sub(0.5).mul(0.25).add(0.55));
-  substrate.normalNode = bumpMap(
-    texture(weave, positionLocal.xy.div(WEAVE_TILE)),
-    select(isSide, float(0), float(0.004)),
-  );
-  partOf(model, 'Substrate').material = substrate;
 
-  // Lid: brushed metal, the printed texture projected on the top face only.
+  const material = new THREE.MeshStandardNodeMaterial({ metalness: 0.05 });
+  material.colorNode = select(isSide, sideColor, maskColor);
+  material.roughnessNode = select(isSide, float(0.7), weaveSample.sub(0.5).mul(0.25).add(0.55));
+  material.normalNode = bumpMap(texture(weave, weaveUv), select(isSide, float(0), float(0.004)));
+  return { material, dispose: disposeAll(material, weave) };
+}
+
+/** Lid: brushed metal, with the printed texture projected on the top face only. */
+function lidDressing(lidMesh: THREE.Mesh, options: CpuOptions): Dressing {
   const print = drawLidTexture(options);
-  const lid = new THREE.MeshPhysicalNodeMaterial({ roughness: 0.3, metalness: 0.92 });
   const isTopFace = normalLocal.z.greaterThan(0.9);
   const printUv = positionLocal.xy.div(CAD.lidSize).add(0.5);
-  lid.colorNode = select(isTopFace, texture(print, printUv).rgb, vec3(0.62, 0.66, 0.7));
-  lid.roughnessNode = select(isTopFace, float(0.28), float(0.4));
-  const lidMesh = partOf(model, 'Lid');
-  lidMesh.material = lid;
+
+  const material = new THREE.MeshPhysicalNodeMaterial({ roughness: 0.3, metalness: 0.92 });
+  material.colorNode = select(isTopFace, texture(print, printUv).rgb, vec3(0.62, 0.66, 0.7));
+  material.roughnessNode = select(isTopFace, float(0.28), float(0.4));
   // Brushed steel: the highlight stretches along the grain. Anisotropy needs a tangent frame,
   // which Three.js derives from UVs; the CAD mesh has none, so project a planar one.
   lidMesh.geometry.setAttribute('uv', planarUv(lidMesh.geometry, CAD.lidSize));
-  lid.anisotropy = 0.6;
+  material.anisotropy = 0.6;
+  return { material, dispose: disposeAll(material, print) };
+}
 
-  // Traces: gold, with a pulse that runs from the lid out to the edge now and then.
-  const traces = new THREE.MeshStandardNodeMaterial({
+/** Traces: gold, with a pulse that runs from the lid out to the edge now and then. */
+function tracesDressing(timeline: Timeline, accent: THREE.Color): Dressing {
+  const material = new THREE.MeshStandardNodeMaterial({
     color: 0xd9b25a,
     roughness: 0.38,
     metalness: 0.9,
@@ -396,24 +397,53 @@ function dressModel(
   const outwards = max(abs(positionLocal.x), abs(positionLocal.y))
     .sub(CAD.lidSize / 2)
     .div(CAD.packageSize / 2 - CAD.lidSize / 2); // 0 at the lid, 1 at the edge
-  const tracePhase = fract(timeline.seconds.mul(0.17).sub(outwards.mul(0.45)).add(0.5));
-  traces.emissiveNode = glow.mul(pulseBand(tracePhase).mul(1.2));
-  partOf(model, 'Traces').material = traces;
+  const phase = fract(timeline.seconds.mul(0.17).sub(outwards.mul(0.45)).add(0.5));
+  const glow = vec3(accent.r, accent.g, accent.b);
+  material.emissiveNode = glow.mul(pulseBand(phase).mul(1.2));
+  return { material, dispose: disposeAll(material) };
+}
 
-  // Capacitors: dark ceramic.
-  const capacitors = new THREE.MeshStandardNodeMaterial({
+/** Capacitors: dark ceramic. */
+function capacitorsDressing(): Dressing {
+  const material = new THREE.MeshStandardNodeMaterial({
     color: 0x2a2d35,
     roughness: 0.45,
     metalness: 0.6,
   });
-  partOf(model, 'Capacitors').material = capacitors;
+  return { material, dispose: disposeAll(material) };
+}
+
+interface DressedModel {
+  lid: THREE.Mesh;
+  dispose(): void;
+}
+
+/**
+ * Replaces the flat CAD colours with the page's materials, one dressing per named part. All
+ * position-based inputs in the dressings are in the model's own frame: metres, Z up, origin at
+ * the centre of the substrate's top face.
+ */
+function dressModel(
+  model: THREE.Group,
+  timeline: Timeline,
+  accent: THREE.Color,
+  options: CpuOptions,
+): DressedModel {
+  const lidMesh = partOf(model, 'Lid');
+  const dressings: Record<string, Dressing> = {
+    Substrate: substrateDressing(),
+    Lid: lidDressing(lidMesh, options),
+    Traces: tracesDressing(timeline, accent),
+    Capacitors: capacitorsDressing(),
+  };
+  for (const [name, dressing] of Object.entries(dressings)) {
+    partOf(model, name).material = dressing.material;
+  }
 
   return {
     lid: lidMesh,
     dispose: () => {
-      for (const material of [substrate, lid, traces, capacitors]) material.dispose();
-      print.dispose();
-      weave.dispose();
+      for (const dressing of Object.values(dressings)) dressing.dispose();
       model.traverse((object) => {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });
