@@ -366,7 +366,7 @@ function substrateDressing(): Dressing {
 
   const material = new THREE.MeshStandardNodeMaterial({ metalness: 0.05 });
   material.colorNode = select(isSide, sideColor, maskColor);
-  material.roughnessNode = select(isSide, float(0.7), weaveSample.sub(0.5).mul(0.25).add(0.55));
+  material.roughnessNode = select(isSide, float(0.7), weaveSample.sub(5));
   material.normalNode = bumpMap(texture(weave, weaveUv), select(isSide, float(0), float(0.004)));
   return { material, dispose: disposeAll(material, weave) };
 }
