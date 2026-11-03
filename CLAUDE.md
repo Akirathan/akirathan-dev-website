@@ -58,7 +58,8 @@ these local runs are the only check.
 ## Structure
 
 ```text
-cad/                 FeatureScript sources of CAD models (Onshape); see below
+cad/                 FeatureScript sources of CAD models (Onshape); cad/export/ = raw exports
+scripts/             build helpers run by hand (model:cpu)
 public/              static files copied as-is (favicon, CNAME)
 src/
   pages/             routes (file-based routing)
@@ -83,6 +84,14 @@ FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP
 (`test_feature`, one API call per run, from a yearly allocation of 2 500), then the owner pastes
 the file into the Feature Studio by hand and exports glTF from the Part Studio. Do not spend
 API calls on bookkeeping tools when a test is all that is needed.
+
+CPU model pipeline: the owner exports the Part Studio as glTF to `cad/export/CPU.gltf`
+(git-ignored, 13 MB). `npm run model:cpu` (`scripts/build-cpu-model.mjs`) drops the pins and the
+`TraceEnd` marker parts, merges primitives, compresses with meshopt, and writes
+`public/models/cpu.glb` (about 60 KB) plus `src/data/cpu-model.json` (trace end points, metres,
+Z up). `src/gfx/cpu.ts` loads the GLB, assigns TSL materials by part name (Substrate, Lid,
+Traces, Capacitors), projects the lid texture from position (CAD meshes have no UVs), and draws
+the pins as one instanced mesh. The `CAD` constant there mirrors the feature's defaults.
 
 ## Conventions
 

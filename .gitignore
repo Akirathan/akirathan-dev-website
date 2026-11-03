@@ -22,3 +22,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Raw CAD exports (large, reproducible from Onshape); the built GLB lives in public/models
+cad/export/
