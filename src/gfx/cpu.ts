@@ -359,9 +359,7 @@ function substrateDressing(): Dressing {
   const weaveSample = texture(weave, weaveUv).r; // 0..1, 0.5 = flat
   const isSide = abs(normalLocal.z).lessThan(0.3);
 
-  // Only the crest of each bundle shows through the mask, as a light thread on dark green.
-  const threads = smoothstep(0.55, 0.8, weaveSample);
-  const maskColor = mix(color(0x142a24), color(0xd4dccf), threads);
+  const maskColor = mix(color(0x142a24), color(0x1b3a30), weaveSample);
   const layer = fract(positionLocal.z.div(CAD.packageThickness / LAMINATE_LAYERS));
   const copperLine = smoothstep(0.4, 0.46, abs(layer.sub(0.5))); // thin band at each layer boundary
   const sideColor = mix(color(0xa89b7c), color(0x55391f), copperLine);
