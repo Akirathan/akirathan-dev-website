@@ -64,6 +64,8 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
                 isLength(definition.traceWidth, { (millimeter) : [0.05, 0.3, 2] } as LengthBoundSpec);
                 annotation { "Name" : "Fan-out" }
                 isLength(definition.traceFan, { (millimeter) : [0, 2.5, 10] } as LengthBoundSpec);
+                annotation { "Name" : "End markers", "Description" : "A tiny cube named TraceEnd <side> <index> at the end of each trace, for the web page to read." }
+                definition.hasMarkers is boolean;
             }
         }
         annotation { "Group Name" : "Capacitors", "Collapsed By Default" : false }
@@ -233,6 +235,21 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
                         points = append(points, turnToSide(corner, side));
                     points = append(points, points[0]);
                     skPolyline(sketch, "trace" ~ side ~ "_" ~ k, { "points" : points });
+
+                    if (definition.hasMarkers)
+                    {
+                        // A marker part at the end of the trace, on the substrate edge. The
+                        // web page reads its position by name, then hides it.
+                        const endPoint = turnToSide(vector(uEnd, f * (vSpan + fan)), side);
+                        const markerId = tid + ("marker" ~ side ~ "_" ~ k);
+                        const r = 0.1 * millimeter;
+                        fCuboid(context, markerId, {
+                                "corner1" : vector(endPoint[0] - r, endPoint[1] - r, -r),
+                                "corner2" : vector(endPoint[0] + r, endPoint[1] + r, r)
+                        });
+                        namePart(context, qCreatedBy(markerId, EntityType.BODY),
+                                 "TraceEnd " ~ side ~ " " ~ (k < 10 ? "0" ~ k : "" ~ k), color(0.66, 0.84, 0.71));
+                    }
                 }
             }
             skSolve(sketch);
@@ -312,6 +329,7 @@ export const cpuPackage = defineFeature(function(context is Context, id is Id, d
         tracesPerSide : 14,
         traceWidth : 0.3 * millimeter,
         traceFan : 2.5 * millimeter,
+        hasMarkers : true,
         hasCapacitors : true,
         capsPerEdge : 7,
         capLength : 2 * millimeter
