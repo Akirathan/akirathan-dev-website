@@ -1,8 +1,9 @@
 ---
 /**
- * Shader page transition. Hooks into Astro's client-side navigation: the curtain covers the
- * page before the swap and reveals the new page after it. Links with `data-nav="back"` and
- * browser back navigation sweep from the right; everything else sweeps from the left.
+ * Shader page transition made of lanes, like the wires of the background. Hooks into Astro's
+ * client-side navigation: the lanes cover the page before the swap and leave after it. Links
+ * with `data-nav="back"` and browser back navigation sweep from the right; everything else
+ * sweeps from the left.
  *
  * Without a GPU, or under `prefers-reduced-motion`, Astro's default transition is used.
  */
@@ -32,9 +33,12 @@
     try {
       const { startPageCurtain } = await import('../gfx/pageCurtain');
       const styles = getComputedStyle(document.documentElement);
+      const theme = (name: string, fallback: string) =>
+        cssColorToHex(styles.getPropertyValue(name).trim(), fallback);
       curtain = await startPageCurtain(canvas, {
-        color: cssColorToHex(styles.getPropertyValue('--color-ink-soft').trim(), '#1c2030'),
-        frontColor: cssColorToHex(styles.getPropertyValue('--color-accent-dim').trim(), '#6b8f78'),
+        color: theme('--color-ink', '#15171e'),
+        lineColor: theme('--color-muted', '#a7a9b3'),
+        pulseColor: theme('--color-accent', '#a9d5b5'),
       });
       // The curtain replaces Astro's default cross-fade.
       document.documentElement.dataset.curtain = '';
@@ -64,7 +68,10 @@
     });
 
     document.addEventListener('astro:after-swap', () => {
-      void curtain?.reveal();
+      if (!curtain) return;
+      // The router replaces the attributes of <html>, so the flag must come back after each swap.
+      document.documentElement.dataset.curtain = '';
+      void curtain.reveal();
     });
   }
 </script>

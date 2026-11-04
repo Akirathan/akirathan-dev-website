@@ -1,18 +1,41 @@
 /**
- * A full-screen curtain for page transitions.
+ * A full-screen curtain for page transitions, made of lanes.
  *
- * The same liquid wipe as the photo gallery, on a coloured surface: `cover()` sweeps it over
- * the page, `reveal()` sweeps it away on the far side. The page swap happens in between.
- * Three.js WebGPURenderer with a WebGL2 fallback; the shader is TSL.
+ * The screen is cut into many thin horizontal lanes, grouped into buses like the wires of the
+ * background. On `cover()` the lanes sweep in from one edge, the lanes of a bus one after the
+ * other and the buses in a random order, while an ink backdrop fades in behind them and a few
+ * quick pulses race along random lanes. The page swap happens behind the cover. On `reveal()`
+ * the lanes leave on the far side, with a few more pulses, and the backdrop fades out.
+ *
+ * Both phases together take about 1.2 s. Three.js WebGPURenderer with a WebGL2 fallback; the
+ * shader is TSL on one full-screen quad.
  */
 import * as THREE from 'three/webgpu';
-import { abs, mix, mx_noise_float, select, smoothstep, uniform, uv, vec2, vec3 } from 'three/tsl';
+import {
+  clamp,
+  exp,
+  float,
+  floor,
+  fract,
+  hash,
+  max,
+  mix,
+  select,
+  smoothstep,
+  step,
+  uniform,
+  uv,
+  vec3,
+} from 'three/tsl';
 
 export interface PageCurtainOptions {
-  /** Curtain colour. */
+  /** Colour of the backdrop that hides the page. */
   color: THREE.ColorRepresentation;
-  /** Colour of the band along the moving front. */
-  frontColor: THREE.ColorRepresentation;
+  /** Colour of the lanes. */
+  lineColor: THREE.ColorRepresentation;
+  /** Colour of the pulses. */
+  pulseColor: THREE.ColorRepresentation;
+  /** Length of one phase, cover or reveal. */
   durationMs?: number;
 }
 
@@ -24,13 +47,34 @@ export interface PageCurtainHandle {
   dispose(): void;
 }
 
+/** Height of one lane, CSS pixels. */
+const LANE_PX = 9;
+/** Thickness of the line in each lane, CSS pixels. */
+const LINE_PX = 1;
+/** Lanes per bus. The lanes of a bus start one after the other. */
+const BUS = 6;
+/** Delay from one lane of a bus to the next, as a share of the screen width. */
+const STAGGER = 0.03;
+/** Largest random delay of a whole bus, as a share of the screen width. */
+const SCATTER = 0.3;
+/** How far a lane front travels for progress 1: the full width plus every delay. */
+const REACH = 1 + SCATTER + (BUS - 1) * STAGGER + 0.02;
+/** Pulses per phase. */
+const PULSES = 5;
+/** Speed of a pulse, screen widths per phase. */
+const PULSE_SPEED = 2.6;
+/** Length of the tail behind a pulse head, as a share of the screen width. */
+const PULSE_TAIL = 0.14;
+/** Opacity of a lane line. */
+const LINE_OPACITY = 0.5;
+
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 export async function startPageCurtain(
   canvas: HTMLCanvasElement,
   options: PageCurtainOptions,
 ): Promise<PageCurtainHandle> {
-  const duration = options.durationMs ?? 650;
+  const duration = options.durationMs ?? 600;
 
   const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -41,31 +85,60 @@ export async function startPageCurtain(
   const uProgress = uniform(0);
   const uDirection = uniform(1);
   const uSeed = uniform(0);
-  const uAspect = uniform(1);
+  const uLanes = uniform(80);
+  /** The line as a share of the lane height. */
+  const uLine = uniform(0.11);
+
+  const revealing = uProgress.greaterThanEqual(1);
+  const phase = select(revealing, uProgress.sub(1), uProgress);
 
   const base = uv();
   const along = select(uDirection.greaterThan(0), base.x, base.x.oneMinus());
-  const noise = mx_noise_float(vec3(base.mul(vec2(uAspect.mul(1.6), 1.6)), uSeed));
-  const edge = along.mul(0.62).add(noise.mul(0.5).add(0.5).mul(0.38));
-  const soft = 0.09;
-  const sweep = (p: THREE.Node<'float'>) =>
-    smoothstep(edge.sub(soft), edge.add(soft), p.mul(1.36).sub(0.18));
-  const front1 = sweep(uProgress);
-  const front2 = sweep(uProgress.sub(1));
-  const covered = front1.sub(front2);
-  const band = smoothstep(0.5, 0.0, abs(front1.sub(0.5))).add(
-    smoothstep(0.5, 0.0, abs(front2.sub(0.5))),
+  const lane = floor(base.y.mul(uLanes));
+  const laneFrac = fract(base.y.mul(uLanes));
+  const bus = floor(lane.div(BUS));
+  const laneInBus = lane.sub(bus.mul(BUS));
+  const delay = hash(bus.add(uSeed)).mul(SCATTER).add(laneInBus.mul(STAGGER));
+
+  // The lane front: on cover the line exists behind it, on reveal in front of it, so that a
+  // line enters from one edge and leaves at the other.
+  const front = phase.mul(REACH).sub(delay);
+  const laneOn = select(revealing, step(front, along), step(along, front));
+  const line = step(laneFrac, uLine);
+
+  // The backdrop fades in early on cover and out late on reveal, so the lanes lead both times.
+  const backdrop = select(
+    revealing,
+    smoothstep(0.3, 0.85, phase).oneMinus(),
+    smoothstep(0.0, 0.5, phase),
   );
 
-  const color = new THREE.Color(options.color);
-  const frontColor = new THREE.Color(options.frontColor);
+  // A few quick pulses on random lanes, different ones in each phase.
+  let pulse: THREE.Node<'float'> = float(0);
+  for (let k = 0; k < PULSES; k++) {
+    const pick = hash(uSeed.add(k * 7.31).add(select(revealing, 101, 0)));
+    const pulseLane = floor(pick.mul(uLanes));
+    const start = hash(uSeed.add(k * 3.17).add(select(revealing, 53, 0))).mul(0.35);
+    const head = phase.sub(start).mul(PULSE_SPEED);
+    const behind = head.sub(along);
+    const shape = exp(max(behind, 0).div(-PULSE_TAIL)).mul(smoothstep(-0.004, 0, behind));
+    pulse = pulse.add(select(lane.equal(pulseLane), shape, 0));
+  }
+  pulse = clamp(pulse, 0, 1);
+
+  const toVec3 = (c: THREE.ColorRepresentation) => {
+    const color = new THREE.Color(c);
+    return vec3(color.r, color.g, color.b);
+  };
   const material = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false });
+  const lineHere = laneOn.mul(line);
+  const withLines = mix(toVec3(options.color), toVec3(options.lineColor), lineHere.mul(0.8));
   material.colorNode = mix(
-    vec3(color.r, color.g, color.b),
-    vec3(frontColor.r, frontColor.g, frontColor.b),
-    band.mul(0.55),
+    withLines,
+    toVec3(options.pulseColor),
+    pulse.mul(line.mul(0.6).add(0.4)),
   );
-  material.opacityNode = covered;
+  material.opacityNode = max(max(backdrop, lineHere.mul(LINE_OPACITY)), pulse.mul(0.9));
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -75,7 +148,9 @@ export async function startPageCurtain(
     const { clientWidth: w, clientHeight: h } = canvas;
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
-    uAspect.value = w / h;
+    const lanes = Math.max(12, Math.round(h / LANE_PX));
+    uLanes.value = lanes;
+    uLine.value = LINE_PX / (h / lanes);
   };
   window.addEventListener('resize', resize);
 
@@ -97,7 +172,7 @@ export async function startPageCurtain(
   return {
     async cover(direction) {
       uDirection.value = direction;
-      uSeed.value = Math.random() * 100;
+      uSeed.value = Math.floor(Math.random() * 1000);
       await animate(0, 1);
     },
     async reveal() {
