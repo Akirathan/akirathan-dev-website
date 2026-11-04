@@ -31,6 +31,7 @@ export const skillCategories: SkillCategory[] = [
       { label: 'Python', slug: 'python' },
       { label: 'C', slug: 'c' },
       { label: 'C++', slug: 'cpp' },
+      { label: 'Rust', slug: 'rust' },
       { label: 'TypeScript', slug: 'typescript' },
       { label: 'Liquid', slug: 'liquid' },
     ],
