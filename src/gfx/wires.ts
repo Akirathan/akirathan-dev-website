@@ -81,11 +81,11 @@ const LANE_STAGGER = 0.006;
 /** Opacity of the three parts of a wire. Each is 0..1; the sum is clamped to 1 at the pulse head. */
 const OPACITY = {
   /** The resting wire: a faint grey line. */
-  wire: 0.09,
+  wire: 0.07,
   /** How much brighter the line gets where a pulse passes. */
-  pulseLine: 0.3,
+  pulseLine: 0.2,
   /** The soft glow around the line where a pulse passes; 0 removes the glow. */
-  pulseGlow: 0.3,
+  pulseGlow: 0.2,
 };
 /** Colour of the resting wire, linear RGB. */
 const WIRE_GREY = { r: 0.3, g: 0.31, b: 0.35 };
