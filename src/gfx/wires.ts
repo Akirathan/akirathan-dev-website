@@ -70,7 +70,7 @@ const SPEED = { min: 0.22, max: 0.3 };
 const PAUSE = { min: 2, max: 7 };
 
 /** Number of buses. */
-const BUS_COUNT = 80;
+const BUS_COUNT = 60;
 /** Lanes per bus: parallel wires that share one route and one pulse rhythm. */
 const LANES = { min: 1, max: 1 };
 /** Distance between two lanes of a bus, world units (about 5 px at 1000 px height). */
