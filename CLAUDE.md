@@ -109,6 +109,9 @@ Unless told otherwise, an agent can only:
 - Reword sentences and paragraphs if the text retains its meaning.
 - An agent can, for example, split a sentence into multiple sentences, or vice versa, if the underlying meaning is retained.
 
+Whenever making changes to the text content, you can commit, but ensure that the commit contains
+"Co-Authored by Claude". I want all the AI text changes to be traceable.
+
 
 ## Conventions
 
