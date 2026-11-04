@@ -40,6 +40,8 @@ export interface WiresOptions {
   accent: string;
   /** Number of wires. */
   count?: number;
+  /** Seed of the layout. The same seed gives the same wires on every load. */
+  seed?: number;
 }
 
 export interface WiresHandle {
@@ -61,7 +63,7 @@ const HALO_PX = 7;
 /** Length of a pulse, world units. */
 const TAIL = 0.14;
 /** Speed of a pulse, world units per second. */
-const SPEED = { min: 0.22, max: 0.42 };
+const SPEED = { min: 0.22, max: 0.6 };
 /** Rest between two pulses on the same wire, seconds. */
 const PAUSE = { min: 2, max: 7 };
 
@@ -83,22 +85,37 @@ interface Wire {
   seed: number;
 }
 
+/** Layout seed used when the options give none. Change it to get a different set of wires. */
+const DEFAULT_SEED = 20261104;
+
+/** A small seeded generator (mulberry32), so that a layout can be reproduced. Returns [0, 1). */
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /** One wire: a random walk of 3 to 8 straight segments, turning by 0° or ±45° between them. */
-function layWire(): Wire {
-  let heading = Math.floor(Math.random() * 8);
-  let at = new THREE.Vector2((Math.random() * 2 - 1) * FIELD.x, (Math.random() * 2 - 1) * FIELD.y);
+function layWire(random: () => number): Wire {
+  let heading = Math.floor(random() * 8);
+  let at = new THREE.Vector2((random() * 2 - 1) * FIELD.x, (random() * 2 - 1) * FIELD.y);
   const segments: Segment[] = [];
   let offset = 0;
-  const steps = 3 + Math.floor(Math.random() * 6);
+  const steps = 3 + Math.floor(random() * 6);
   for (let i = 0; i < steps; i++) {
-    const len = 0.12 + Math.random() * 0.55;
+    const len = 0.12 + random() * 0.55;
     const angle = (heading * Math.PI) / 4;
     const end = new THREE.Vector2(at.x + Math.cos(angle) * len, at.y + Math.sin(angle) * len);
     segments.push({ a: at, b: end, offset, widthPx: LINE_PX });
     offset += len;
     at = end;
     if (Math.abs(at.x) > FIELD.x || Math.abs(at.y) > FIELD.y) break;
-    const turn = Math.random();
+    const turn = random();
     heading = (heading + (turn < 0.3 ? 7 : turn < 0.6 ? 1 : 0)) % 8;
   }
   const wireLength = offset;
@@ -106,10 +123,10 @@ function layWire(): Wire {
   segments.push({ a: segments[0]!.a, b: segments[0]!.a, offset: 0, widthPx: PAD_PX });
   segments.push({ a: at, b: at, offset: wireLength, widthPx: PAD_PX });
 
-  const speed = SPEED.min + Math.random() * (SPEED.max - SPEED.min);
-  const pause = PAUSE.min + Math.random() * (PAUSE.max - PAUSE.min);
+  const speed = SPEED.min + random() * (SPEED.max - SPEED.min);
+  const pause = PAUSE.min + random() * (PAUSE.max - PAUSE.min);
   const span = wireLength + TAIL * 2 + pause * speed;
-  return { segments, span, period: span / speed, seed: Math.random() };
+  return { segments, span, period: span / speed, seed: random() };
 }
 
 interface WireAttributes {
@@ -242,7 +259,8 @@ export async function startWires(
     pointer: vec2Uniform(new THREE.Vector2()),
     motion: floatUniform(options.reducedMotion ? 0 : 1),
   };
-  const wires = Array.from({ length: options.count ?? 34 }, layWire);
+  const random = seededRandom(options.seed ?? DEFAULT_SEED);
+  const wires = Array.from({ length: options.count ?? 34 }, () => layWire(random));
   const attributes = packWires(wires);
   const material = makeMaterial(attributes, new THREE.Color(options.accent), uniforms);
   const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, attributes.count);
