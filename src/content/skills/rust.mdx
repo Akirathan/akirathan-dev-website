@@ -1,0 +1,24 @@
+---
+tagline: ???
+draft: true
+---
+
+TODO: Expertise 7/10
+
+# Rust
+
+Rust is basically C++ with enforced [smart pointers](???) and [move semantics](???).
+Only with a different syntax and better compiler errors.
+For anybody who comes from Python / Java / JavaScript, I can understand that the [borrow checker](???) can feel overwhelming.
+But for anybody that has ever delt with C++ smart pointers and move semantics, borrow checker feels like a better and simpler alternative.
+
+I am a big fan of Rust.
+What is there not to like?:
+- Rust is release with its own "standardized" build system - `cargo`.
+- `cargo` is simple (compared to various JVM build tools) and includes support for tests.
+- Unit tests right next to your implementation feels very nice.
+- Compiles to native code and most importantly, does not include garbage collector, unlike [Go](???) or Java compiled with [Native Image](???).
+
+For beginners, it used to be the case that writing Rust code that is compilable and satisfies the borrow checker used to be problematic.
+In the era of AI, not anymore, since the agents write code for you.
+The only downside may be that when multiple agents are working in multiple worktrees, your CPU and disk usage can explode if you are not using some kind of [shared build cache](???).

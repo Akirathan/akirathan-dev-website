@@ -1,0 +1,96 @@
+---
+title: JPMS (Java Platform Module System)
+tagline: ???
+order: 4
+summary:
+  - ???
+draft: true
+---
+
+# JPMS (Java Platform Module System)
+[JPMS](???) was introduced in JDK 9.
+It promises to help with the following:
+- Better encapsulation at both compile time and run time.
+
+## Brief introduction
+
+Java module is nothing more than a JAR archive with a [*module declaration*](???).
+A *module declaration* is a special `module-info.class` file that, as the name suggests, declares a module.
+In that declaration, you can:
+
+**Dependencies between components**
+- Restrict other modules from reflectively accessing your module.
+- By default, the module is *closed* to all reflective access.
+- Specify dependencies on other modules.
+- Either runtime or static (build-time dependency).
+- *Export* packages
+- By default, all packages inside the module are *private* to the module - they can't be accessed from outside the module.
+- Optionally, you can export packages to just a specific set of other modules.
+
+**Service discovery and registration**
+- Declare service use.
+- At runtime, JVM ensures that you can only call `ServiceLoader.load(org.example.Service.class)` iff you have declared `uses org.example.Service` in your module declaration.
+- Declare service provision.
+- The syntax `provides org.example.Service with org.example.ServiceImpl` in module declaration tells JPMS that our module implements `Service` with the class `ServiceImpl`.
+
+At the end, my attempts to migrate Enso to JPMS turned out to be so involved that it evolved into a 50 minutes talk at [Geecon Krakow 2024 conference](???).
+You can see the recording of the talk on [youtube](https://www.youtube.com/watch?v=63yPccoPGDc&list=PLxZQe6I1pYpet-lLqg22YWMiANXGhJxCN&index=24&t=1712s).
+
+## Migrate a fat JAR to a modular JAR
+
+### Split packages
+
+Two different modules cannot contain packages with the same name.
+This is an inherent limitation of JPMS, which is not present in other Java modular systems, like
+[OSGi](???) or [Netbeans Container Runtime](???).
+
+Very typical when you want to unit test a package private method.
+You define some `unit.test` module that tests `impl` module and usually, in unit tests you want to call package private methods from the implementation.
+Which means that `unit.test` module and `impl` module contain package with the same name.
+But this is illegal in JPMS - the JVM will refuse to boot.
+
+#### Solutions
+There are only two possible solutions to the *split package* problem.
+The first one is almost straightforward - you just put all the same-named packages into a single module - either an existing one or a new one.
+But this is only possible if you are the owner of the code.
+If you are not the owner of the code, and you cannot change it, you must rely on patching the modules via cmdline options like:
+- `--add-opens`
+- `--add-exports`
+- `--patch-module`
+
+## Conclusion
+If you want to delve deeper into all the possible problems that you can encouter when doing this kind of migration, I suggest you watch [our talk](https://www.youtube.com/watch?v=63yPccoPGDc&list=PLxZQe6I1pYpet-lLqg22YWMiANXGhJxCN&index=24&t=1712s) (the list of all potential problems starts roughly around 35 minutes in the video).
+
+### Are your dependencies modular?
+That is, do they provide a sensible `module-info.class` file in their JAR archives?
+
+If not, it is likely you will have to use some of the *patching* cmd line options in production, like `--add-opens` or `--add-exports`.
+Good example is [Apache Arrow](??) library that tries to open an internal class of `java.nio` module for reflection - which now results in `IllegalAccessError`.
+
+### Is your build tool module-aware?
+
+Maven handles modules auto-magically without any 3rd party plugins.
+For example, when running unit tests for your modules, it automatically injects proper `--patch-module` command line options.
+Or when building your project, it auto-magically injects proper `--module-path` options.
+
+`sbt`, on the other hand, has no awareness of the JPMS modules.
+Which basically means that it knows nothing of all these `--module-path` related options.
+You have to handle that yourself.
+There is no mature 3rd party plugin that handles that reliably.
+See [JPMSPlugin](https://github.com/enso-org/enso/blob/develop/project/JPMSPlugin.scala) - a custom sbt plugin that we have built in Enso.
+
+### Mixing Scala and Java
+
+Mixed Java and Scala code turned out to be one of the major pain points of the migration.
+If there are no circular dependencies between Java and Scala sources, everything is almost fine - sbt calls `javac` for Java sources and `scalac` for Scala sources.
+The problem starts when you call both Java from Scala and Scala from Java.
+In such a case, you must use [CompileOrder.Mixed](https://www.scala-sbt.org/1.x/docs/Java-Sources.html#Usage).
+In this mode, `sbt` passes both Java and Scala sources to `scalac`.
+`scalac` parses the Java sources and builds its own symbols tables from it, so that it knows which Java symbols you can actually use from Scala.
+But it cannot parse `module-info.java`.
+So you are forced to exclude `module-info.java` from regular sources observed by sbt and compile it on your own.
+See how this hack is used in the [JPMSPlugin](https://github.com/enso-org/enso/blob/e40fe338e7d0ddee5ba852abe5c699491eb237df/project/JPMSPlugin.scala#L45-L60).
+
+
+
+
