@@ -3,10 +3,12 @@
  * copper of a circuit board, each with a signal pulse now and then.
  *
  * Three.js WebGPURenderer: WebGPU where available, WebGL2 otherwise. The wires are laid out once
- * on the CPU as straight segments with 45° turns. Every segment, and every round pad at a wire
- * end, is one instance of a quad. The fragment shader draws the line as a signed distance field
- * inside the quad, so it stays about one and a half pixels wide at any resolution and the joins
- * are round. The pulses need only the time uniform: each wire has its own speed and rest period.
+ * on the CPU as buses: a route of straight segments with 45° turns, copied into 2 to 8 parallel
+ * lanes like the data bus of a CPU. Every segment, and every round pad at a lane end, is one
+ * instance of a quad. The fragment shader draws the line as a signed distance field inside the
+ * quad, so it stays about one and a half pixels wide at any resolution and the joins are round.
+ * The pulses need only the time uniform: each bus has its own speed and rest period, and the
+ * lanes fire one after the other.
  *
  * The instances blend with "max" instead of "add", so a wire that crosses another, or a quad
  * that overlaps its neighbour at a join, does not get brighter.
@@ -38,7 +40,7 @@ export interface WiresOptions {
   reducedMotion: boolean;
   /** Colour of the pulses, hex. */
   accent: string;
-  /** Number of wires. */
+  /** Number of buses. */
   count?: number;
   /** Seed of the layout. The same seed gives the same wires on every load. */
   seed?: number;
@@ -67,6 +69,15 @@ const SPEED = { min: 0.22, max: 0.6 };
 /** Rest between two pulses on the same wire, seconds. */
 const PAUSE = { min: 2, max: 7 };
 
+/** Number of buses. */
+const BUS_COUNT = 18;
+/** Lanes per bus: parallel wires that share one route and one pulse rhythm. */
+const LANES = { min: 2, max: 8 };
+/** Distance between two lanes of a bus, world units (about 5 px at 1000 px height). */
+const LANE_PITCH = 0.011;
+/** Delay of the pulse from one lane to the next, as a fraction of the cycle. */
+const LANE_STAGGER = 0.006;
+
 interface Segment {
   a: THREE.Vector2;
   b: THREE.Vector2;
@@ -81,7 +92,7 @@ interface Wire {
   span: number;
   /** Seconds per cycle. */
   period: number;
-  /** Phase, 0..1, so that the wires do not pulse together. */
+  /** Phase of the pulse cycle, so that the buses do not pulse together. */
   seed: number;
 }
 
@@ -100,33 +111,86 @@ function seededRandom(seed: number): () => number {
   };
 }
 
-/** One wire: a random walk of 3 to 8 straight segments, turning by 0° or ±45° between them. */
-function layWire(random: () => number): Wire {
+/** The centre line of a bus: a random walk of 3 to 8 straight segments with 0° or ±45° turns. */
+function layRoute(random: () => number): THREE.Vector2[] {
   let heading = Math.floor(random() * 8);
-  let at = new THREE.Vector2((random() * 2 - 1) * FIELD.x, (random() * 2 - 1) * FIELD.y);
-  const segments: Segment[] = [];
-  let offset = 0;
+  const route = [new THREE.Vector2((random() * 2 - 1) * FIELD.x, (random() * 2 - 1) * FIELD.y)];
   const steps = 3 + Math.floor(random() * 6);
   for (let i = 0; i < steps; i++) {
     const len = 0.12 + random() * 0.55;
     const angle = (heading * Math.PI) / 4;
-    const end = new THREE.Vector2(at.x + Math.cos(angle) * len, at.y + Math.sin(angle) * len);
-    segments.push({ a: at, b: end, offset, widthPx: LINE_PX });
-    offset += len;
-    at = end;
-    if (Math.abs(at.x) > FIELD.x || Math.abs(at.y) > FIELD.y) break;
+    const at = route[route.length - 1]!;
+    route.push(new THREE.Vector2(at.x + Math.cos(angle) * len, at.y + Math.sin(angle) * len));
+    const end = route[route.length - 1]!;
+    if (Math.abs(end.x) > FIELD.x || Math.abs(end.y) > FIELD.y) break;
     const turn = random();
     heading = (heading + (turn < 0.3 ? 7 : turn < 0.6 ? 1 : 0)) % 8;
   }
-  const wireLength = offset;
-  // Round pads at both ends, as zero-length segments.
-  segments.push({ a: segments[0]!.a, b: segments[0]!.a, offset: 0, widthPx: PAD_PX });
-  segments.push({ a: at, b: at, offset: wireLength, widthPx: PAD_PX });
+  return route;
+}
 
+/** Left-hand unit normal of the segment from `a` to `b`. */
+const normalOf = (a: THREE.Vector2, b: THREE.Vector2) =>
+  new THREE.Vector2(a.y - b.y, b.x - a.x).normalize();
+
+/**
+ * The route shifted sideways by `distance`. Corners move along the mitre, so that the parallel
+ * copy keeps the same turns and the lanes stay at a constant distance.
+ */
+function offsetRoute(route: THREE.Vector2[], distance: number): THREE.Vector2[] {
+  return route.map((point, i) => {
+    const before = i > 0 ? normalOf(route[i - 1]!, point) : null;
+    const after = i < route.length - 1 ? normalOf(point, route[i + 1]!) : null;
+    let shift: THREE.Vector2;
+    if (before && after) {
+      // Mitre: the sum of the two normals, scaled so that the distance to both segments is kept.
+      shift = before
+        .clone()
+        .add(after)
+        .multiplyScalar(1 / (1 + before.dot(after)));
+    } else {
+      shift = (before ?? after)!;
+    }
+    return point.clone().addScaledVector(shift, distance);
+  });
+}
+
+/** One lane of a bus as segments and pads. Returns the segments and the length of the lane. */
+function laneSegments(points: THREE.Vector2[]): { segments: Segment[]; length: number } {
+  const segments: Segment[] = [];
+  let offset = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    segments.push({ a, b, offset, widthPx: LINE_PX });
+    offset += a.distanceTo(b);
+  }
+  // Round pads at both ends, as zero-length segments.
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+  segments.push({ a: first, b: first, offset: 0, widthPx: PAD_PX });
+  segments.push({ a: last, b: last, offset, widthPx: PAD_PX });
+  return { segments, length: offset };
+}
+
+/**
+ * One bus: 2 to 8 parallel lanes on one route. The lanes share the speed and the rest period, so
+ * a pulse runs down the whole bus, each lane a little after the one before it.
+ */
+function layBus(random: () => number): Wire[] {
+  const route = layRoute(random);
+  const lanes = LANES.min + Math.floor(random() * (LANES.max - LANES.min + 1));
   const speed = SPEED.min + random() * (SPEED.max - SPEED.min);
   const pause = PAUSE.min + random() * (PAUSE.max - PAUSE.min);
-  const span = wireLength + TAIL * 2 + pause * speed;
-  return { segments, span, period: span / speed, seed: random() };
+  const seed = random();
+  const wires: Wire[] = [];
+  for (let lane = 0; lane < lanes; lane++) {
+    const points = offsetRoute(route, (lane - (lanes - 1) / 2) * LANE_PITCH);
+    const { segments, length } = laneSegments(points);
+    const span = length + TAIL * 2 + pause * speed;
+    wires.push({ segments, span, period: span / speed, seed: seed + lane * LANE_STAGGER });
+  }
+  return wires;
 }
 
 interface WireAttributes {
@@ -260,7 +324,7 @@ export async function startWires(
     motion: floatUniform(options.reducedMotion ? 0 : 1),
   };
   const random = seededRandom(options.seed ?? DEFAULT_SEED);
-  const wires = Array.from({ length: options.count ?? 34 }, () => layWire(random));
+  const wires = Array.from({ length: options.count ?? BUS_COUNT }, () => layBus(random)).flat();
   const attributes = packWires(wires);
   const material = makeMaterial(attributes, new THREE.Color(options.accent), uniforms);
   const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, attributes.count);
