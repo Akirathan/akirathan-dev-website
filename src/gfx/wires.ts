@@ -65,7 +65,7 @@ const HALO_PX = 10;
 /** Length of a pulse, world units. */
 const TAIL = 0.07;
 /** Speed of a pulse, world units per second. */
-const SPEED = { min: 0.22, max: 0.6 };
+const SPEED = { min: 0.22, max: 0.3 };
 /** Rest between two pulses on the same wire, seconds. */
 const PAUSE = { min: 2, max: 7 };
 
