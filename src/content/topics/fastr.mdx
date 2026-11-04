@@ -15,7 +15,7 @@ library, or its optimizations. It is to make all the _native extensions_ work.
 [R programming language](https://www.r-project.org/), built on [GraalVM](https://www.graalvm.org/)
 and the [Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/)
 framework and backed by [Oracle Labs](https://labs.oracle.com/). Its goal is compatibility with the
-reference implementation, [GNU R](https://www.r-project.org/about.html). I worked on it from 2019
+reference implementation, [GNU-R](https://www.r-project.org/about.html). I worked on it from 2019
 to 2022.
 
 How do you measure compatibility with the reference implementation? An official _Test
@@ -26,22 +26,27 @@ semantics of the language. For some languages, like
 importantly, no culture of native extensions. R is the opposite case.
 
 A _native extension_ is a package that binds the language to native code, usually C or C++. The
-two examples below show two different kinds of hidden contract that such packages rely on: the
-memory layout of objects and the lifetime of objects.
+three sections below show two kinds of hidden contract that such packages rely on. The first two
+are about the memory layout of objects: an API that exposes it, and a package that abuses it. The
+third is about the lifetime of objects.
 
 ## The cost of returning non-opaque pointers from your API
 
-Every object in R has two parts: a header and the data.
-Vast majority of the objects in R are [vectors](???).
-A vector, in GNU R:
-- uses exactly `n` bytes for the header,
-- places the data immediately after the header in memory as a continuous region.
+Every object in R has two parts: a header and the data. The vast majority of the objects in R are
+[vectors](https://cran.r-project.org/doc/manuals/r-release/R-ints.html#SEXPTYPEs). A vector, in
+GNU-R:
 
-That is probably why authors of R initially introduced functions like [DATAPTR](???) in the native extension API.
-Those functions take the opaque `SEXP` pointer to a vector and returns pointer to `void`, which is supposed to point to the continuous region in the memory.
-Having a pointer to `void`, native extension users are expected to do pointer arithmetics to read the data.
-A common pattern is:
-```C
+- uses exactly `n` bytes for the header,
+- places the data immediately after the header in memory, as one continuous region.
+
+That is probably why the authors of R initially introduced functions like
+[DATAPTR](https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Vector-accessor-functions)
+in the native extension API. Those functions take the opaque `SEXP` pointer to a vector and return
+a pointer to `void`, which is supposed to point to the continuous region in memory. With a pointer
+to `void`, native extension authors are expected to do pointer arithmetic to read the data. A
+common pattern is:
+
+```c
 void read_int_vector(SEXP vector) {
   int *dataptr = (int *) DATAPTR(vector);
   for (size_t i = 0; i < LENGTH(vector); i++) {
@@ -51,20 +56,28 @@ void read_int_vector(SEXP vector) {
 }
 ```
 
-### Why this was a bad choice
+### Why it hurts
 
-Because of functions like `DATAPTR`, all the alternative R implementations are now enforced to copy/transform the internal data of their vectors to a continuous memory region in the native heap.
-FASTR's implementation is in [RIntVector$ToNative](https://github.com/oracle/fastr/blob/3ee714dfa568db8dae75e8d9f0b03ff450976074/com.oracle.truffle.r.runtime/src/com/oracle/truffle/r/runtime/data/RIntVector.java#L305-L315).
+Because of functions like `DATAPTR`, every alternative R implementation is forced to copy or
+transform the internal data of its vectors into a continuous memory region on the native heap.
+FastR's vectors live on the Java heap, so the native region is a mirror that has to be created
+and kept in sync. FastR does it in
+[RIntVector$ToNative](https://github.com/oracle/fastr/blob/3ee714dfa568db8dae75e8d9f0b03ff450976074/com.oracle.truffle.r.runtime/src/com/oracle/truffle/r/runtime/data/RIntVector.java#L305-L315).
 
-Dire consequences are not only for alternative R implementations, but also for GNU-R authors themselves: vectors cannot load lazily, all their data is expected to be in the memory once `DATAPTR` function returns.
-This is suboptimal, or even impossible, for big vectors or vectors that are fetched from some external sources.
+The dire consequences are not only for alternative R implementations, but also for the GNU-R
+authors themselves: vectors cannot load lazily, because all their data is expected to be in memory
+once `DATAPTR` returns. This is suboptimal, or even impossible, for big vectors or for vectors
+fetched from an external source.
 
-### An attempt to fix this
+### What FastR did
 
-An answer to mitigate such downside was [ALTREP](???) - *Alternative data Representation*.
-ALTREP is basically a new set of functions in the native extension API that allows to bypass the `DATAPTR` and therefore the unnecessary materialization of the data.
-To read the data of an integer vector via ALTREP:
-```C
+The answer of the R authors to this downside was
+[ALTREP](https://svn.r-project.org/R/branches/ALTREP/ALTREP.html), _Alternative Representation_.
+ALTREP is basically a new set of functions in the native extension API that allows a package to
+bypass `DATAPTR`, and therefore the unnecessary materialization of the data. To read the data of
+an integer vector via ALTREP:
+
+```c
 void read_int_vector_altrep(SEXP vector) {
   for (size_t i = 0; i < LENGTH(vector); i++) {
     int elem = INTEGER_ELT(vector, i);
@@ -73,49 +86,46 @@ void read_int_vector_altrep(SEXP vector) {
 }
 ```
 
-
+I implemented ALTREP support in FastR during my internship at Oracle Labs. It touches the deepest
+parts of the runtime: every vector type, the native API, and the places where a vector crosses
+from the Java heap to native code.
 
 ## data.table manipulates native memory directly
 
 [data.table](https://r-datatable.com/) is a native extension for R. It is basically a
 re-implementation of the built-in
 [data.frame](https://stat.ethz.ch/R-manual/R-devel/library/base/html/data.frame.html) that promises
-more features and more speed.
-In the pursuit of optimizations, `data.table` does various direct memory manipulations that are hard to emulate on FastR, or that leads to memory leaks.
+more features and more speed. In the pursuit of optimizations, `data.table` does various direct
+memory manipulations that are hard to emulate on FastR, or that lead to memory leaks.
 
-Note: The following example is present on `data.table` version `1.10.4`.
-On the latest version `1.18.6` it seems to be "fixed".
+This is the `DATAPTR` cost from the previous section in practice. FastR keeps the real vector on
+the Java heap and hands native code a mirror of its data. When native code moves bytes inside the
+mirror, the Java side cannot know about it. A reference that was removed from the native mirror is
+still held by the Java object, and the Java garbage collector keeps it alive.
 
-One example is calling `memmove` on the pointer obtained by `DATAPTR` in [assign.c](https://github.com/Rdatatable/data.table/blob/8b201fd28f5d4afcc4be026a5d9eb4bb6dd62955/src/assign.c#L670-L713).
-The `memmove` basically shifts the elements of the list by one.
-In order for the Java GC to know that the last element was removed and is eligible for garbage collection, we had to patch it like this:
+One example is a call to `memmove` on the pointer obtained from `DATAPTR` in
+[assign.c](https://github.com/Rdatatable/data.table/blob/8b201fd28f5d4afcc4be026a5d9eb4bb6dd62955/src/assign.c#L670-L713).
+The `memmove` removes a column by shifting the elements of the list by one. For the Java garbage
+collector to learn that the last element was removed, we had to patch it like this:
+
 ```diff
---- data.table/src/assign.c	2017-10-19 23:11:19
-+++ patched/src/assign.c	2026-11-04 15:54:38
-@@ -693,16 +696,28 @@
-                 // A new column being assigned NULL would have been warned above, added above, and now deleted (just easier
-                 // to code it this way e.g. so that other columns may be added or removed ok by the same query).
-                 size=sizeof(SEXP *);
 -                memmove((char *)DATAPTR(dt)+coln*size,
-+                /*memmove((char *)DATAPTR(dt)+coln*size,
-                         (char *)DATAPTR(dt)+(coln+1)*size,
+-                        (char *)DATAPTR(dt)+(coln+1)*size,
 -                        (LENGTH(dt)-coln-1)*size);
-+                        (LENGTH(dt)-coln-1)*size);*/
-+                // This removes a column (element of a list)
-+                // shifts all columns left to coln by one to left, overriding coln and duplicating the last element in the list
-+                // Java GC issue: we won't find out that the element under coln was removed and still hold to it on Java side
-+                assert(coln < LENGTH(dt));
++                // Shift the columns through the API, so that the Java side sees the change.
 +                for(in = coln; in < LENGTH(dt) - 1; in++) {
 +                    SET_VECTOR_ELT(dt, in, VECTOR_ELT(dt, in+1));
 +                }
-+                // set the last element (now equal to the last but one element) to NULL and change the length
                  SET_VECTOR_ELT(dt, LENGTH(dt)-1, R_NilValue);
                  SETLENGTH(dt, LENGTH(dt)-1);
 ```
 
+Note: The patch above is for `data.table` version `1.10.4`. The latest version, `1.18.6`, seems to have
+"fixed" this place, but the pattern appears elsewhere in the package.
+
 ## Packages that skip PROTECT
 
-GNU R is single-threaded, with a sequential, reference-counting,
+GNU-R is single-threaded, with a sequential, reference-counting,
 [stop-the-world garbage collector](https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Garbage-Collection).
 Whenever you allocate a new object in native code, you are supposed to call the
 [PROTECT](https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Garbage-Collection)
@@ -129,10 +139,12 @@ PROTECT(obj);
 
 the `PROTECT(obj)` call ensures that `obj` will not be garbage collected.
 
+### Why it hurts
+
 Nothing enforces this contract. No linter, no runtime error. So over time, package authors (by
 mistake, I assume) just allocated objects and used them without bumping their reference count.
 Their packages worked, because the only place where the garbage collector runs is inside another
-allocation. So in GNU R, the following snippet is perfectly safe:
+allocation. So in GNU-R, the following snippet is perfectly safe:
 
 ```c
 SEXP obj = allocVector(...);
@@ -144,7 +156,7 @@ as long as there is no other `allocVector` inside `do_some_computation`.
 This is yet another problem for an alternative R implementation: it has to make sure that such
 objects are not garbage collected, even though they _should be_ according to the semantics.
 
-### Solution
+### What FastR did
 
 Keep every object that was allocated in native code reachable from a GC root, that is, hold no
 weak references to it. See
@@ -153,15 +165,19 @@ in the FastR sources.
 
 ## Takeaways
 
-**Compatibility** is measured not only by the percentage of the referential language semantics and syntax your alternative implementation supports, or by the coverage of the official TCK, but, most importantly, by how many 3rd party tools, packages, and libraries your implementation supports without any workarounds required from the users.
-In FastR, we have, unfortunately, never been able to support [RStudio](???) - one of the most popular GUI tool for working with R.
-Which may have been one of the major contributing reasons for the R users not to migrate to FastR.
+**Compatibility** is measured not only by the percentage of the reference language semantics and
+syntax that your alternative implementation supports, or by the coverage of the official TCK, but,
+most importantly, by how many third-party tools, packages, and libraries your implementation
+supports without any workarounds required from the users. In FastR, we have, unfortunately, never
+been able to support [RStudio](https://posit.co/products/open-source/rstudio/), the most popular
+GUI tool for working with R. ??? One clause: why, if the reason was native code. That may have been
+one of the major reasons why R users did not migrate to FastR.
 
-**Native extensions are evil**.
-Try to avoid native extensions at all costs.
-This can, however, be decided only when you are creating a new language from scratch.
-If native extensions are inevitable, try to restrict them as much as possible.
-Everything that you expose to your users, either explicitly via API, or implicitly by not imposing enough restrictions, will sooner or later be used by your users, and you will have to support it in the future.
+**Native extensions are evil.** Try to avoid native extensions at all costs. This can, however, be
+decided only when you are creating a new language from scratch. If native extensions are
+inevitable, try to restrict them as much as possible. Everything that you expose to your users,
+either explicitly via an API, or implicitly by not imposing enough restrictions, will sooner or
+later be used by your users, and you will have to support it in the future.
 
 Since around 2022, FastR is in maintenance mode. An unfortunate, but expectable event, given the
 last decade of hype and the migration of many data-analysis workflows to
