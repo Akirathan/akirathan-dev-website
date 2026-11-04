@@ -7,9 +7,7 @@ summary:
 draft: true
 ---
 
-# FastR
-
-An alternative [R programming language](??) interpreter backed by [Oracle Labs](???).
+An alternative [R programming language](??) interpreter, running on [GraalVM](???)  and [Truffle](???) technologies, aiming to be compatible with the referential implementation [GNU-R](???), backed by [Oracle Labs](???).
 Since around 2022, transitioned to a maintenance mode.
 An unfortunate, but expectable event, based on the recent decade of hype and migration of many data-analysis workflows to [Python](???).
 
@@ -39,10 +37,24 @@ So in order to get to the data part of the object, instead of using the official
 This imposes a big problem to anybody wishing to contribute an alternative R implementation that should support `data-table`: they need to ensure that whenever somebody
 is doing something like:
 ```C
-uint_32t *ptr = ...;
+uint32_t *ptr = ...;
 *(ptr + 9) = (byte) 42;
 ```
-, you need to write value `42` as a first element of the vector pointed to by `ptr`.
+you need to write value `42` as a first element of the vector pointed to by `ptr`.
+
+#### Solution
+
+There are two possible solutions.
+Both suboptimal.
+
+1. Patch the sources of the library:
+- Clone a specific version of the library to your repository and patch all the problematic native code manually.
+- A lof of effort.
+- Only possible if license allows it
+
+2. Sync the native memory representation with GNU-R:
+- When an object "leaks" to the native code, ensure that it is byte-by-byte equal to its GNU-R counterpart on the native heap.
+- This comes with an obvious performance downside.
 
 ### Stop-the-world garbage collector
 GNU-R is single threaded with sequential, reference counting, [stop-the-world garbage collector](???).
@@ -67,6 +79,11 @@ as long as in `do_some_computation` there is not another `allocVector`.
 
 This imposes yet another problem for alternative R implementations, as we have to ensure that such objects
 are not garbage collected, even though they *should be* according to the semantics.
+
+#### Solution
+
+Keeping objects allocated in the native code reachable from GC root, that is, no weak references.
+See [FastR/RFFIContext#registerReferenceUsedInNative](https://github.com/oracle/fastr/blob/034fd27be855adb68ba556c37fe870ea4d7152be/com.oracle.truffle.r.runtime/src/com/oracle/truffle/r/runtime/ffi/RFFIContext.java#L115-L132).
 
 
 
