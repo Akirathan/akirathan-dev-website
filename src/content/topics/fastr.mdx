@@ -7,83 +7,110 @@ summary:
 draft: true
 ---
 
-An alternative [R programming language](??) interpreter, running on [GraalVM](???)  and [Truffle](???) technologies, aiming to be compatible with the referential implementation [GNU-R](???), backed by [Oracle Labs](???).
-Since around 2022, transitioned to a maintenance mode.
-An unfortunate, but expectable event, based on the recent decade of hype and migration of many data-analysis workflows to [Python](???).
+Despite the popular understanding, the most difficult part of implementing an alternative
+interpreter of a programming language is not to re-implement its semantics, its standard
+library, or its optimizations. It is to make all the _native extensions_ work.
 
-How do you measure compatibility with the *referential implementation*?
-An official *Test Compatibility Kit* (TCK) is a nice start, if it is provided.
-But that only covers the language syntax and semantics.
-For some languages, like [ECMA script](??) or [Lua](??) it is almost enough, as they don't really have a standard library and most importantly, they don't have **native extensions**.
-Despite the popular understanding, the most difficult part of implementing an alternative programming language interpreter is not to re-implement its semantics, standard library, or various optimizations, it is to ensure that all the *native extensions* are compatible.
+[FastR](https://github.com/oracle/fastr) is an alternative interpreter of the
+[R programming language](https://www.r-project.org/), built on [GraalVM](https://www.graalvm.org/)
+and the [Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/)
+framework and backed by [Oracle Labs](https://labs.oracle.com/). Its goal is compatibility with the
+reference implementation, [GNU R](https://www.r-project.org/about.html). I worked on it from 2019
+to 2022.
 
-## Native extensions
+How do you measure compatibility with the reference implementation? An official _Test
+Compatibility Kit_ (TCK) is a nice start, if there is one. But a TCK covers only the syntax and the
+semantics of the language. For some languages, like
+[ECMAScript](https://ecma-international.org/publications-and-standards/standards/ecma-262/) or
+[Lua](https://www.lua.org/), that is almost enough: they have a small standard library and, most
+importantly, no culture of native extensions. R is the opposite case.
 
-A *native extension* is a library / package that binds the language to a native code like C or C++.
-They use the native code internally.
+A _native extension_ is a package that binds the language to native code, usually C or C++. The
+two examples below show two different kinds of hidden contract that such packages rely on: the
+memory layout of objects and the lifetime of objects.
 
-### data-table example
-[data-table](https://r-datatable.com/) is a native extension (a library) for R.
-It is basically a re-implementation of the built-in [data.frame](???) that promises more features and speed.
-To achieve these goals, the authors of `data-table` (ab)used the knowledge of internal memory representation of R objects.
-Every object in R is just a *vector*, with two parts: a header part and a data part.
-Internally, GNU-R (the referential implementation):
-- uses exactly `n` bytes for header,
-- the data part immediately follows the header part in the memory.
+## data.table reads memory directly
 
-So in order to get to the data part of the object, instead of using the officially provided
-[Rf_data](??) function, the `data-table` authors do a pointer arithmetics, which is perfectly legal in C.
+[data.table](https://r-datatable.com/) is a native extension for R. It is basically a
+re-implementation of the built-in
+[data.frame](https://stat.ethz.ch/R-manual/R-devel/library/base/html/data.frame.html) that promises
+more features and more speed. To get there, the authors of `data.table` (ab)used their knowledge
+of the internal memory representation of R objects. Every object in R is a _vector_ with two parts:
+a header and the data. Internally, GNU R:
 
-This imposes a big problem to anybody wishing to contribute an alternative R implementation that should support `data-table`: they need to ensure that whenever somebody
-is doing something like:
-```C
-uint32_t *ptr = ...;
-*(ptr + 9) = (byte) 42;
+- uses exactly `n` bytes for the header,
+- places the data immediately after the header in memory.
+
+So in order to get to the data of an object, instead of calling the official
+[Rf_data](??) function, `data.table` does pointer arithmetic, which is perfectly legal in C.
+
+This is a big problem for anybody who wants to build an alternative R implementation that
+supports `data.table`. Whenever somebody writes something like:
+
+```c
+uint32_t *ptr = (uint32_t *) vector;
+*(ptr + 9) = 42;
 ```
-you need to write value `42` as a first element of the vector pointed to by `ptr`.
 
-#### Solution
+you need to write the value `42` as the first element of the vector pointed to by `ptr`.
 
-There are two possible solutions.
-Both suboptimal.
+### Solution
 
-1. Patch the sources of the library:
-- Clone a specific version of the library to your repository and patch all the problematic native code manually.
-- A lof of effort.
-- Only possible if license allows it
+There are two possible solutions, and both are suboptimal.
 
-2. Sync the native memory representation with GNU-R:
-- When an object "leaks" to the native code, ensure that it is byte-by-byte equal to its GNU-R counterpart on the native heap.
-- This comes with an obvious performance downside.
+The first is to patch the sources of the package: clone a specific version into your repository
+and fix all the problematic native code by hand. That is a lot of effort, and it is possible only
+if the license allows it.
 
-### Stop-the-world garbage collector
-GNU-R is single threaded with sequential, reference counting, [stop-the-world garbage collector](???).
-Whenever you allocate a new object in the native code, you are supposed to call [PROTECT](???) function which bumps the GC reference count.
-In other words, in:
-```C
-SEXP *obj = allocVector(...);
+The second is to keep the native memory representation in sync with GNU R: when an object
+"leaks" to native code, make sure that it is byte-for-byte equal to its GNU R counterpart on the
+native heap. This comes with an obvious performance cost.
+
+??? Which one FastR chose, and why.
+
+## Packages that skip PROTECT
+
+GNU R is single-threaded, with a sequential, reference-counting,
+[stop-the-world garbage collector](https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Garbage-Collection).
+Whenever you allocate a new object in native code, you are supposed to call the
+[PROTECT](https://cran.r-project.org/doc/manuals/r-release/R-exts.html#Garbage-Collection)
+function, which bumps the reference count of the object for the garbage collector (GC). In other
+words, in:
+
+```c
+SEXP obj = allocVector(...);
 PROTECT(obj);
 ```
-the `PROTECT(obj)` ensures that `obj` will not be garbage collected.
 
-There is nothing ensuring that this contract holds.
-No enforced linter, no runtime error.
-So over the time, authors (I assume by a mistake) just allocated and used objects without bumping their reference count.
-Their library worked, because the only place where a garbage collector is called is from another allocation.
-So in GNU-R, the following snippet is perfectly safe:
-```C
-SEXP *obj = allocVector(...);
+the `PROTECT(obj)` call ensures that `obj` will not be garbage collected.
+
+Nothing enforces this contract. No linter, no runtime error. So over time, package authors (by
+mistake, I assume) just allocated objects and used them without bumping their reference count.
+Their packages worked, because the only place where the garbage collector runs is inside another
+allocation. So in GNU R, the following snippet is perfectly safe:
+
+```c
+SEXP obj = allocVector(...);
 do_some_computation(obj);
 ```
-as long as in `do_some_computation` there is not another `allocVector`.
 
-This imposes yet another problem for alternative R implementations, as we have to ensure that such objects
-are not garbage collected, even though they *should be* according to the semantics.
+as long as there is no other `allocVector` inside `do_some_computation`.
 
-#### Solution
+This is yet another problem for an alternative R implementation: it has to make sure that such
+objects are not garbage collected, even though they _should be_ according to the semantics.
 
-Keeping objects allocated in the native code reachable from GC root, that is, no weak references.
-See [FastR/RFFIContext#registerReferenceUsedInNative](https://github.com/oracle/fastr/blob/034fd27be855adb68ba556c37fe870ea4d7152be/com.oracle.truffle.r.runtime/src/com/oracle/truffle/r/runtime/ffi/RFFIContext.java#L115-L132).
+### Solution
 
+Keep every object that was allocated in native code reachable from a GC root, that is, hold no
+weak references to it. See
+[`RFFIContext#registerReferenceUsedInNative`](https://github.com/oracle/fastr/blob/034fd27be855adb68ba556c37fe870ea4d7152be/com.oracle.truffle.r.runtime/src/com/oracle/truffle/r/runtime/ffi/RFFIContext.java#L115-L132)
+in the FastR sources.
 
+## What I took from it
 
+??? Two or three sentences: what the work taught you about compatibility, and how it shaped
+your later language work at Enso.
+
+Since around 2022, FastR is in maintenance mode. An unfortunate, but expectable event, given the
+last decade of hype and the migration of many data-analysis workflows to
+[Python](https://www.python.org/).
