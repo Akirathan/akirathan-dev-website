@@ -88,7 +88,8 @@ void read_int_vector_altrep(SEXP vector) {
 
 I implemented ALTREP support in FastR during my internship at Oracle Labs. It touches the deepest
 parts of the runtime: every vector type, the native API, and the places where a vector crosses
-from the Java heap to native code.
+from the Java heap to native code. Moreover, it, obviously, increased compatibility. For example,
+package [vroom](https://vroom.tidyverse.org/) uses ALTREP extensively.
 
 ## data.table manipulates native memory directly
 
