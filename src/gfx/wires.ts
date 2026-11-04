@@ -78,6 +78,20 @@ const LANE_PITCH = 0.009;
 /** Delay of the pulse from one lane to the next, as a fraction of the cycle. */
 const LANE_STAGGER = 0.006;
 
+/** Opacity of the three parts of a wire. Each is 0..1; the sum is clamped to 1 at the pulse head. */
+const OPACITY = {
+  /** The resting wire: a faint grey line. */
+  wire: 0.09,
+  /** How much brighter the line gets where a pulse passes. */
+  pulseLine: 0.3,
+  /** The soft glow around the line where a pulse passes; 0 removes the glow. */
+  pulseGlow: 0.3,
+};
+/** Colour of the resting wire, linear RGB. */
+const WIRE_GREY = { r: 0.3, g: 0.31, b: 0.35 };
+/** How far the pulse colour is pushed from the accent towards white, 0..1. */
+const PULSE_WHITENESS = 0.3;
+
 interface Segment {
   a: THREE.Vector2;
   b: THREE.Vector2;
@@ -280,13 +294,12 @@ function makeMaterial(attributes: WireAttributes, accent: THREE.Color, u: Unifor
   const behind = head.sub(alongWire);
   const pulse = exp(max(behind, 0).div(-TAIL)).mul(step(0, behind)).mul(u.motion);
 
-  const grey = vec3(0.3, 0.31, 0.35);
-  const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), 0.3);
-  const alpha = clamp(
-    core.mul(0.16).add(core.mul(pulse).mul(0.8)).add(halo.mul(pulse).mul(0.3)),
-    0,
-    1,
-  );
+  const grey = vec3(WIRE_GREY.r, WIRE_GREY.g, WIRE_GREY.b);
+  const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), PULSE_WHITENESS);
+  const restingLine = core.mul(OPACITY.wire);
+  const pulseLine = core.mul(pulse).mul(OPACITY.pulseLine);
+  const pulseGlow = halo.mul(pulse).mul(OPACITY.pulseGlow);
+  const alpha = clamp(restingLine.add(pulseLine).add(pulseGlow), 0, 1);
   const rgb = mix(grey, glow, clamp(pulse.mul(1.5), 0, 1));
   // Premultiplied, for the max blending below.
   material.colorNode = vec4(rgb.mul(alpha), alpha);
