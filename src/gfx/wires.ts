@@ -90,7 +90,7 @@ const OPACITY = {
 /** Colour of the resting wire, linear RGB. */
 const WIRE_GREY = { r: 0.3, g: 0.31, b: 0.35 };
 /** How far the pulse colour is pushed from the accent towards white, 0..1. */
-const PULSE_WHITENESS = 0.3;
+const PULSE_WHITENESS = 0.2;
 
 interface Segment {
   a: THREE.Vector2;
