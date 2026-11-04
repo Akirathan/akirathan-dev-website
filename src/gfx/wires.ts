@@ -61,20 +61,20 @@ const LINE_PX = 1.4;
 /** Diameter of the pad at each end of a wire, CSS pixels. */
 const PAD_PX = 4.5;
 /** Half extent of the quad around a segment, CSS pixels: room for the glow of a pulse. */
-const HALO_PX = 7;
+const HALO_PX = 10;
 /** Length of a pulse, world units. */
-const TAIL = 0.14;
+const TAIL = 0.07;
 /** Speed of a pulse, world units per second. */
 const SPEED = { min: 0.22, max: 0.6 };
 /** Rest between two pulses on the same wire, seconds. */
 const PAUSE = { min: 2, max: 7 };
 
 /** Number of buses. */
-const BUS_COUNT = 18;
+const BUS_COUNT = 80;
 /** Lanes per bus: parallel wires that share one route and one pulse rhythm. */
-const LANES = { min: 2, max: 8 };
+const LANES = { min: 1, max: 1 };
 /** Distance between two lanes of a bus, world units (about 5 px at 1000 px height). */
-const LANE_PITCH = 0.011;
+const LANE_PITCH = 0.009;
 /** Delay of the pulse from one lane to the next, as a fraction of the cycle. */
 const LANE_STAGGER = 0.006;
 
