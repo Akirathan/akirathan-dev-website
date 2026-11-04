@@ -94,6 +94,22 @@ Traces, Capacitors), projects the lid print and the substrate weave from positio
 have no UVs), and draws
 the pins as one instanced mesh. The `CAD` constant there mirrors the feature's defaults.
 
+## Text content editing
+
+This section documents how an agent should interact with the content (text) provided by Pavel.
+Relevant files:
+- Pretty much all `*.mdx` and `*.md` files.
+  - With the obvious exception of `CLAUDE.md`.
+- Other source files that contain text (not code) provided by Pavel.
+
+One of the promises of this project is that **vast majority, if not all, text was created by Pavel
+from his own experiences and opinions**.
+Unless told otherwise, an agent can only:
+- Fix typos and grammar.
+- Reword sentences and paragraphs if the text retains its meaning.
+- An agent can, for example, split a sentence into multiple sentences, or vice versa, if the underlying meaning is retained.
+
+
 ## Conventions
 
 - Style with Tailwind utility classes in markup. Add custom CSS only for what utilities cannot
