@@ -11,14 +11,14 @@ import portrait from '../assets/portrait.jpg';
 interface Props {
   title?: string;
   description?: string;
-  /** Render the animated starfield. Detail pages keep only the static gradient. */
-  starfield?: boolean;
+  /** Render the animated wire background. Detail pages keep only the static gradient. */
+  animatedBackground?: boolean;
 }
 
 const {
   title = 'Pavel Marek',
   description = 'Senior software engineer: compilers, runtimes, the JVM and GraalVM. Co-founder & CTO of Lístky radosti.',
-  starfield = false,
+  animatedBackground = false,
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -48,7 +48,7 @@ const ogImageUrl = new URL(ogImage.src, Astro.site);
     <ClientRouter />
   </head>
   <body class="flex min-h-dvh flex-col">
-    {starfield ? (
+    {animatedBackground ? (
       <Background />
     ) : (
       <div
