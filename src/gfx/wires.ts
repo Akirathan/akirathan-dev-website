@@ -56,6 +56,8 @@ export interface WiresHandle {
 
 /** The field the wires are laid in, world units. The camera shows y in [-1, 1]. */
 const FIELD = { x: 2.6, y: 1.1 };
+/** A point far outside the field, used to park the spotlight when there is no pointer. */
+const FAR = 100;
 /** Core width of a wire, CSS pixels. */
 const LINE_PX = 1.4;
 /** Diameter of the pad at each end of a wire, CSS pixels. */
@@ -86,6 +88,13 @@ const OPACITY = {
   pulseLine: 0.2,
   /** The soft glow around the line where a pulse passes; 0 removes the glow. */
   pulseGlow: 0.2,
+};
+/** The spotlight around the pointer: lanes inside the radius get brighter. */
+const SPOTLIGHT = {
+  /** Radius, world units (0.4 is about 180 px at 1000 px height). */
+  radius: 0.4,
+  /** Extra opacity of a lane right under the pointer. */
+  opacity: 0.3,
 };
 /** Colour of the resting wire, linear RGB. */
 const WIRE_GREY = { r: 0.3, g: 0.31, b: 0.35 };
@@ -249,7 +258,10 @@ const vec2Uniform = (value: THREE.Vector2) => uniform(value);
 interface Uniforms {
   /** World units per CSS pixel; depends on the canvas height. */
   pxToWorld: ReturnType<typeof floatUniform>;
+  /** Smoothed pointer, -1..1 on both axes; drives the parallax. */
   pointer: ReturnType<typeof vec2Uniform>;
+  /** Pointer in world units, quicker to follow; centre of the spotlight. Far away when absent. */
+  spotlight: ReturnType<typeof vec2Uniform>;
   motion: ReturnType<typeof floatUniform>;
 }
 
@@ -296,10 +308,14 @@ function makeMaterial(attributes: WireAttributes, accent: THREE.Color, u: Unifor
 
   const grey = vec3(WIRE_GREY.r, WIRE_GREY.g, WIRE_GREY.b);
   const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), PULSE_WHITENESS);
+  // The spotlight: 1 under the pointer, 0 at the radius, smooth in between.
+  const nearPointer = smoothstep(0, SPOTLIGHT.radius, length(point.sub(u.spotlight))).oneMinus();
+
   const restingLine = core.mul(OPACITY.wire);
+  const litLine = core.mul(nearPointer).mul(SPOTLIGHT.opacity);
   const pulseLine = core.mul(pulse).mul(OPACITY.pulseLine);
   const pulseGlow = halo.mul(pulse).mul(OPACITY.pulseGlow);
-  const alpha = clamp(restingLine.add(pulseLine).add(pulseGlow), 0, 1);
+  const alpha = clamp(restingLine.add(litLine).add(pulseLine).add(pulseGlow), 0, 1);
   const rgb = mix(grey, glow, clamp(pulse.mul(1.5), 0, 1));
   // Premultiplied, for the max blending below.
   material.colorNode = vec4(rgb.mul(alpha), alpha);
@@ -334,6 +350,7 @@ export async function startWires(
   const uniforms: Uniforms = {
     pxToWorld: floatUniform(0.002),
     pointer: vec2Uniform(new THREE.Vector2()),
+    spotlight: vec2Uniform(new THREE.Vector2(FAR, FAR)),
     motion: floatUniform(options.reducedMotion ? 0 : 1),
   };
   const random = seededRandom(options.seed ?? DEFAULT_SEED);
@@ -344,14 +361,17 @@ export async function startWires(
   mesh.frustumCulled = false;
   scene.add(mesh);
 
-  // The pointer is smoothed on the CPU so that the wires follow with a little lag.
+  // The pointer is smoothed on the CPU so that the wires follow with a little lag. The
+  // spotlight follows faster, in world units: x spans ±aspect, y spans ±1.
   const targetPointer = new THREE.Vector2();
+  const targetSpotlight = new THREE.Vector2(FAR, FAR);
   const onPointerMove = (e: PointerEvent) => {
-    targetPointer.set(
-      (e.clientX / window.innerWidth) * 2 - 1,
-      -((e.clientY / window.innerHeight) * 2 - 1),
-    );
+    const x = (e.clientX / window.innerWidth) * 2 - 1;
+    const y = -((e.clientY / window.innerHeight) * 2 - 1);
+    targetPointer.set(x, y);
+    targetSpotlight.set(x * (canvas.clientWidth / canvas.clientHeight), y);
   };
+  const onPointerLeave = () => targetSpotlight.set(FAR, FAR);
 
   const resize = () => {
     const { clientWidth: w, clientHeight: h } = canvas;
@@ -368,6 +388,7 @@ export async function startWires(
   let running = false;
   const frame = () => {
     uniforms.pointer.value.lerp(targetPointer, 0.04);
+    uniforms.spotlight.value.lerp(targetSpotlight, 0.2);
     renderOnce();
   };
   const start = () => {
@@ -386,6 +407,7 @@ export async function startWires(
 
   window.addEventListener('resize', resize);
   window.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.addEventListener('pointerleave', onPointerLeave);
   document.addEventListener('visibilitychange', onVisibility);
   visible.observe(canvas);
 
@@ -398,6 +420,7 @@ export async function startWires(
       visible.disconnect();
       window.removeEventListener('resize', resize);
       window.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('visibilitychange', onVisibility);
       mesh.geometry.dispose();
       material.dispose();
