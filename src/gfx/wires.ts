@@ -165,10 +165,14 @@ interface Wire {
   period: number;
   /** Phase of the pulse cycle, so that the buses do not pulse together. */
   seed: number;
-  /** Distance along the lane where it leaves the burst circle, or -1. A burst pulse runs on. */
-  burstOut: number;
-  /** Distance along the lane where it enters the burst circle, or -1. A burst pulse runs back. */
-  burstIn: number;
+  /**
+   * The burst on this lane, distances along the lane, -1 = none. `out`: where the lane leaves
+   * the circle; a pulse runs on from there, its tail reaching back to `outFrom` (where the lane
+   * entered the circle, or the lane start). `in`: where the lane enters the circle; a pulse
+   * runs back from there, its tail reaching on to `inTo` (where the lane leaves again, or the
+   * lane end).
+   */
+  burst: { out: number; outFrom: number; in: number; inTo: number };
 }
 
 /** Layout seed used when the options give none. Change it to get a different set of wires. */
@@ -231,13 +235,15 @@ function offsetRoute(route: THREE.Vector2[], distance: number): THREE.Vector2[] 
 }
 
 /**
- * Where a lane crosses the burst circle: the first point where it leaves the circle, and the
- * first point where it enters it, as distances along the lane. -1 when there is no such point.
+ * Where a lane crosses the burst circle, walking along the lane: the first point where it
+ * leaves the circle and the first point where it enters it, each with the far end of the chord
+ * inside the circle, so that a pulse tail can fill the chord. Distances along the lane; -1 = none.
  */
-function burstCrossings(points: THREE.Vector2[]): { out: number; in: number } {
+function burstCrossings(points: THREE.Vector2[]): Wire['burst'] {
   const r2 = BURST.radius * BURST.radius;
-  let out = -1;
-  let into = -1;
+  const result = { out: -1, outFrom: -1, in: -1, inTo: -1 };
+  // Where the lane last entered the circle: the lane start if it begins inside.
+  let lastEntry = points[0]!.lengthSq() < r2 ? 0 : -1;
   let offset = 0;
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]!;
@@ -253,15 +259,26 @@ function burstCrossings(points: THREE.Vector2[]): { out: number; in: number } {
       for (const t of [(-qb - root) / (2 * qa), (-qb + root) / (2 * qa)]) {
         if (t < 0 || t > 1) continue;
         const hit = a.clone().addScaledVector(d, t);
-        const leaving = hit.dot(d) > 0;
         const s = offset + t * len;
-        if (leaving && out < 0) out = s;
-        if (!leaving && into < 0) into = s;
+        if (hit.dot(d) > 0) {
+          // Leaving the circle.
+          if (result.out < 0) {
+            result.out = s;
+            result.outFrom = Math.max(lastEntry, 0);
+          }
+          if (result.in >= 0 && result.inTo < 0) result.inTo = s;
+        } else {
+          // Entering the circle.
+          if (result.in < 0) result.in = s;
+          lastEntry = s;
+        }
       }
     }
     offset += len;
   }
-  return { out, in: into };
+  // Entered and never left again: the tail may reach to the lane end.
+  if (result.in >= 0 && result.inTo < 0) result.inTo = offset;
+  return result;
 }
 
 /** One lane of a bus as segments and pads. Returns the segments and the length of the lane. */
@@ -300,14 +317,12 @@ function layBus(random: () => number, look: WiresLook): Wire[] {
     const points = offsetRoute(route, (lane - (lanes - 1) / 2) * look.lanePitch);
     const { segments, length } = laneSegments(points, look);
     const span = length + look.tail * 2 + pause * speed;
-    const crossings = burstCrossings(points);
     wires.push({
       segments,
       span,
       period: span / speed,
       seed: seed + lane * look.laneStagger,
-      burstOut: crossings.out,
-      burstIn: crossings.in,
+      burst: burstCrossings(points),
     });
   }
   return wires;
@@ -319,7 +334,7 @@ interface WireAttributes {
   segment: THREE.InstancedBufferAttribute;
   /** Per instance: offset along the wire, period, span, seed. */
   wire: THREE.InstancedBufferAttribute;
-  /** Per instance: burst start running on, burst start running back; -1 = none. */
+  /** Per instance: burst out, outFrom, in, inTo (see `Wire.burst`); -1 = none. */
   burst: THREE.InstancedBufferAttribute;
   /** Per instance: core width in CSS pixels. */
   width: THREE.InstancedBufferAttribute;
@@ -329,14 +344,14 @@ function packWires(wires: Wire[]): WireAttributes {
   const count = wires.reduce((n, wire) => n + wire.segments.length, 0);
   const segment = new Float32Array(count * 4);
   const wireData = new Float32Array(count * 4);
-  const burst = new Float32Array(count * 2);
+  const burst = new Float32Array(count * 4);
   const width = new Float32Array(count);
   let i = 0;
   for (const wire of wires) {
     for (const s of wire.segments) {
       segment.set([s.a.x, s.a.y, s.b.x, s.b.y], i * 4);
       wireData.set([s.offset, wire.period, wire.span, wire.seed], i * 4);
-      burst.set([wire.burstOut, wire.burstIn], i * 2);
+      burst.set([wire.burst.out, wire.burst.outFrom, wire.burst.in, wire.burst.inTo], i * 4);
       width[i] = s.widthPx;
       i++;
     }
@@ -345,7 +360,7 @@ function packWires(wires: Wire[]): WireAttributes {
     count,
     segment: new THREE.InstancedBufferAttribute(segment, 4),
     wire: new THREE.InstancedBufferAttribute(wireData, 4),
-    burst: new THREE.InstancedBufferAttribute(burst, 2),
+    burst: new THREE.InstancedBufferAttribute(burst, 4),
     width: new THREE.InstancedBufferAttribute(width, 1),
   };
 }
@@ -379,7 +394,7 @@ function makeMaterial(
 ) {
   const aSegment = instancedBufferAttribute<'vec4'>(attributes.segment, 'vec4');
   const aWire = instancedBufferAttribute<'vec4'>(attributes.wire, 'vec4');
-  const aBurst = instancedBufferAttribute<'vec2'>(attributes.burst, 'vec2');
+  const aBurst = instancedBufferAttribute<'vec4'>(attributes.burst, 'vec4');
   const aWidth = instancedBufferAttribute<'float'>(attributes.width, 'float');
 
   // The quad: the segment from a to b, extended by the halo at both ends and both sides.
@@ -424,21 +439,23 @@ function makeMaterial(
     .mul(u.pulses);
 
   // The burst: from where the lane leaves the circle a pulse runs on; from where it enters, a
-  // pulse runs back. Each lives only up to `travel` from its start and then vanishes, as at a
-  // lane end: the head passes the limit and the tail slides out after it.
+  // pulse runs back. At the start the head sits on the circle and the tail fills the chord
+  // inside it, so the first frame is a star. Each pulse lives only up to `travel` from the
+  // circle and then vanishes, as at a lane end: the head passes the limit and the tail slides
+  // out after it.
   const burstSpeed = (look.speed.min + look.speed.max) / 2;
   const burstHead = u.burstTime.mul(burstSpeed);
   const exists = (start: THREE.Node<'float'>) => step(0, start);
   const onward = aBurst.x;
   const behindOn = onward.add(burstHead).sub(alongWire);
-  const withinOn = step(onward, alongWire).mul(step(alongWire, onward.add(BURST.travel)));
+  const withinOn = step(aBurst.y, alongWire).mul(step(alongWire, onward.add(BURST.travel)));
   const burstOn = exp(max(behindOn, 0).div(-BURST.tail))
     .mul(step(0, behindOn))
     .mul(withinOn)
     .mul(exists(onward));
-  const backward = aBurst.y;
+  const backward = aBurst.z;
   const behindBack = alongWire.sub(backward.sub(burstHead));
-  const withinBack = step(alongWire, backward).mul(step(backward.sub(BURST.travel), alongWire));
+  const withinBack = step(alongWire, aBurst.w).mul(step(backward.sub(BURST.travel), alongWire));
   const burstBack = exp(max(behindBack, 0).div(-BURST.tail))
     .mul(step(0, behindBack))
     .mul(withinBack)
