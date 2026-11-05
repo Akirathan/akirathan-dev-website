@@ -115,29 +115,30 @@ export interface WiresHandle {
   /** Switch the resting pulses on or off, for example when the page changes. */
   setPulses(enabled: boolean): void;
   /**
-   * Play the navigation burst: the resting pulses fade out, and long bright pulses leave the
-   * circle at the centre of the screen along every lane that crosses it. See `BURST`.
+   * Play the navigation burst: the resting pulses fade out, and long bright pulses leave a
+   * circle along every lane that crosses it. See `BURST`. `at` is the centre of the circle in
+   * CSS pixels of the viewport, for example the last click; the default is the screen centre.
    */
-  burst(): void;
+  burst(at?: { x: number; y: number }): void;
   dispose(): void;
 }
 
 /** The navigation burst. Distances are world units; the screen is 2 units high. */
 export const BURST = {
   /** Length of the whole burst, milliseconds. */
-  ms: 2000,
+  ms: 1000,
   /** Radius of the circle at the centre of the screen where the pulses start. */
   radius: 0.22,
   /** How far a pulse travels from the circle before it vanishes, as at a lane end. */
-  travel: 0.3,
+  travel: 0.2,
   /** Length of a burst pulse. The resting pulses use `WiresLook.tail`. */
   tail: 0.2,
   /** Width of a burst pulse, as a multiple of the line width. */
-  width: 2.4,
+  width: 1.3,
   /** Opacity of the line and of the glow under a burst pulse. */
   opacity: { line: 0.9, glow: 0.5 },
   /** How fast the resting pulses fade when the burst starts, per frame. */
-  fade: 0.12,
+  fade: 0.2,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -159,6 +160,8 @@ interface Segment {
 
 interface Wire {
   segments: Segment[];
+  /** The lane as a polyline, kept to recompute the burst crossings for a new centre. */
+  points: THREE.Vector2[];
   /** How far the pulse head travels per cycle: the wire, the tail, and the rest. */
   span: number;
   /** Seconds per cycle. */
@@ -239,15 +242,16 @@ function offsetRoute(route: THREE.Vector2[], distance: number): THREE.Vector2[] 
  * leaves the circle and the first point where it enters it, each with the far end of the chord
  * inside the circle, so that a pulse tail can fill the chord. Distances along the lane; -1 = none.
  */
-function burstCrossings(points: THREE.Vector2[]): Wire['burst'] {
+function burstCrossings(points: THREE.Vector2[], centre: THREE.Vector2): Wire['burst'] {
   const r2 = BURST.radius * BURST.radius;
   const result = { out: -1, outFrom: -1, in: -1, inTo: -1 };
   // Where the lane last entered the circle: the lane start if it begins inside.
-  let lastEntry = points[0]!.lengthSq() < r2 ? 0 : -1;
+  let lastEntry = points[0]!.distanceToSquared(centre) < r2 ? 0 : -1;
   let offset = 0;
   for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i]!;
-    const d = points[i + 1]!.clone().sub(a);
+    // Relative to the centre, so that the circle is |p| = r.
+    const a = points[i]!.clone().sub(centre);
+    const d = points[i + 1]!.clone().sub(points[i]!);
     const len = d.length();
     // |a + t d|² = r²  ->  (d·d) t² + 2 (a·d) t + (a·a - r²) = 0
     const qa = d.dot(d);
@@ -319,10 +323,11 @@ function layBus(random: () => number, look: WiresLook): Wire[] {
     const span = length + look.tail * 2 + pause * speed;
     wires.push({
       segments,
+      points,
       span,
       period: span / speed,
       seed: seed + lane * look.laneStagger,
-      burst: burstCrossings(points),
+      burst: burstCrossings(points, new THREE.Vector2()),
     });
   }
   return wires;
@@ -599,8 +604,24 @@ export async function startWires(
     setPulses(enabled) {
       pulsesEnabled = enabled;
     },
-    burst() {
+    burst(at) {
       if (options.reducedMotion) return;
+      // The centre in world units: x spans ±aspect, y spans ±1, the origin is the screen centre.
+      const { clientWidth: w, clientHeight: h } = canvas;
+      const centre = at
+        ? new THREE.Vector2(((at.x / w) * 2 - 1) * (w / h), -((at.y / h) * 2 - 1))
+        : new THREE.Vector2();
+      // Recompute the crossings for every lane and upload them; the shader reads the attribute.
+      const data = attributes.burst.array as Float32Array;
+      let i = 0;
+      for (const wire of wires) {
+        const b = burstCrossings(wire.points, centre);
+        for (let k = 0; k < wire.segments.length; k++) {
+          data.set([b.out, b.outFrom, b.in, b.inTo], i * 4);
+          i++;
+        }
+      }
+      attributes.burst.needsUpdate = true;
       burstStart = performance.now();
     },
     dispose() {

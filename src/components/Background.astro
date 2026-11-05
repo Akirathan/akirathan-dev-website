@@ -6,7 +6,7 @@
  * The canvas persists across client-side navigation, so the wires never restart. The page says
  * which mode it wants through `data-background` on <body>: "full" runs the resting pulses,
  * "quiet" (reading pages) keeps only the lanes and the pointer spotlight. Every navigation plays
- * the burst from the centre of the screen.
+ * the burst, centred on the last click, or on the link that was activated.
  */
 ---
 
@@ -67,6 +67,22 @@
     }
   };
 
+  // The burst starts where the visitor clicked. A navigation by keyboard, or by the browser's
+  // back button, has no recent click: then the activated link, if any, or the screen centre.
+  let lastClick: { x: number; y: number; at: number } | null = null;
+  window.addEventListener(
+    'pointerdown',
+    (e) => (lastClick = { x: e.clientX, y: e.clientY, at: performance.now() }),
+    { capture: true, passive: true },
+  );
+  const burstCentre = (source: Element | undefined) => {
+    if (lastClick && performance.now() - lastClick.at < 1500) return lastClick;
+    const rect = source?.getBoundingClientRect();
+    return rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : undefined;
+  };
+
   document.addEventListener('astro:page-load', schedule);
-  document.addEventListener('astro:before-preparation', () => handle?.burst());
+  document.addEventListener('astro:before-preparation', (event) => {
+    handle?.burst(burstCentre(event.sourceElement));
+  });
 </script>
