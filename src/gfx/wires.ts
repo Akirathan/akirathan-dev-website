@@ -1,15 +1,14 @@
 /**
- * Wires: thin grey traces that run across the screen like the copper of a circuit board, each
- * with a signal pulse now and then. The landing-page background uses them in a loop; the page
- * transition (`pageCurtain.ts`) draws and erases them lane by lane with a different look.
+ * Wire background for the landing page: thin grey traces that run across the screen like the
+ * copper of a circuit board, each with a signal pulse now and then.
  *
  * Three.js WebGPURenderer: WebGPU where available, WebGL2 otherwise. The wires are laid out once
- * on the CPU as buses: a route of straight segments with 45° turns, copied into parallel lanes
- * like the data bus of a CPU. Every segment, and every round pad at a lane end, is one instance
- * of a quad. The fragment shader draws the line as a signed distance field inside the quad, so
- * it stays about one and a half pixels wide at any resolution and the joins are round. The
- * pulses need only the time uniform: each bus has its own speed and rest period, and the lanes
- * fire one after the other.
+ * on the CPU as buses: a route of straight segments with 45° turns, copied into 2 to 8 parallel
+ * lanes like the data bus of a CPU. Every segment, and every round pad at a lane end, is one
+ * instance of a quad. The fragment shader draws the line as a signed distance field inside the
+ * quad, so it stays about one and a half pixels wide at any resolution and the joins are round.
+ * The pulses need only the time uniform: each bus has its own speed and rest period, and the
+ * lanes fire one after the other.
  *
  * The instances blend with "max" instead of "add", so a wire that crosses another, or a quad
  * that overlaps its neighbour at a join, does not get brighter.
@@ -36,103 +35,18 @@ import {
   vec4,
 } from 'three/tsl';
 
-// ---------------------------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------------------------
-
-/** Everything that decides how the wires look and behave. See `BACKGROUND_LOOK` for values. */
-export interface WiresLook {
-  /** Number of buses. */
-  buses: number;
-  /** Lanes per bus: parallel wires that share one route and one pulse rhythm. */
-  lanes: { min: number; max: number };
-  /** Distance between two lanes of a bus, world units. The screen is 2 units high. */
-  lanePitch: number;
-  /** Core width of a wire, CSS pixels. */
-  linePx: number;
-  /** Diameter of the pad at each end of a wire, CSS pixels. */
-  padPx: number;
-  /** Half extent of the quad around a segment, CSS pixels: room for the glow of a pulse. */
-  haloPx: number;
-  /** Length of a pulse, world units. */
-  tail: number;
-  /** Speed of a pulse, world units per second. */
-  speed: { min: number; max: number };
-  /** Rest between two pulses on the same wire, seconds. */
-  pause: { min: number; max: number };
-  /** Delay of the pulse from one lane to the next, as a fraction of the cycle. */
-  laneStagger: number;
-  /** Opacity of the parts of a wire. Each is 0..1; the sum is clamped to 1 at a pulse head. */
-  opacity: {
-    /** The resting wire: a faint grey line. */
-    wire: number;
-    /** How much brighter the line gets where a pulse passes. */
-    pulseLine: number;
-    /** The soft glow around the line where a pulse passes; 0 removes the glow. */
-    pulseGlow: number;
-  };
-  /** The spotlight around the pointer: lanes inside the radius get brighter. */
-  spotlight: {
-    /** Radius, world units. */
-    radius: number;
-    /** Extra opacity of a lane right under the pointer. */
-    opacity: number;
-  };
-  /** Colour of the resting wire, linear RGB. */
-  grey: { r: number; g: number; b: number };
-  /** How far the pulse colour is pushed from the accent towards white, 0..1. */
-  pulseWhiteness: number;
-}
-
-/** The look of the landing-page background. */
-export const BACKGROUND_LOOK: WiresLook = {
-  buses: 100,
-  lanes: { min: 1, max: 1 },
-  lanePitch: 0.009,
-  linePx: 1.4,
-  padPx: 4.5,
-  haloPx: 10,
-  tail: 0.07,
-  speed: { min: 0.22, max: 0.3 },
-  pause: { min: 2, max: 7 },
-  laneStagger: 0.006,
-  opacity: { wire: 0.07, pulseLine: 0.2, pulseGlow: 0.2 },
-  spotlight: { radius: 0.4, opacity: 0.3 },
-  grey: { r: 0.3, g: 0.31, b: 0.35 },
-  pulseWhiteness: 0.2,
-};
-
 export interface WiresOptions {
   /** Draw the wires once, without pulses. */
   reducedMotion: boolean;
   /** Colour of the pulses, hex. */
   accent: string;
+  /** Number of buses. */
+  count?: number;
   /** Seed of the layout. The same seed gives the same wires on every load. */
   seed?: number;
-  /** Changes to the look. Give whole sub-objects, for example the whole `opacity`. */
-  look?: Partial<WiresLook>;
-  /** Follow the pointer with the parallax and the spotlight. Default true. */
-  interactive?: boolean;
-  /**
-   * Render on an animation loop while the canvas is visible. Default true. With false the caller
-   * renders through the handle, and the pointer and visibility listeners are not installed.
-   */
-  loop?: boolean;
 }
 
 export interface WiresHandle {
-  /** Render one frame now. Needed only with `loop: false`. */
-  render(): void;
-  /**
-   * How much of each lane is drawn from its start, 0 to 1. The lanes of a bus follow one
-   * another and the buses start in a random order, so 1 is the first value where every lane is
-   * complete. The default is "all drawn".
-   */
-  setDraw(progress: number): void;
-  /** How much of each lane is erased from its start, 0 to 1, with the same order as `setDraw`. */
-  setErase(progress: number): void;
-  /** With true, draw and erase run from the other end of each lane. */
-  setFlip(flip: boolean): void;
   dispose(): void;
 }
 
@@ -144,12 +58,48 @@ export interface WiresHandle {
 const FIELD = { x: 2.6, y: 1.1 };
 /** A point far outside the field, used to park the spotlight when there is no pointer. */
 const FAR = 100;
-/** Layout seed used when the options give none. Change it to get a different set of wires. */
-const DEFAULT_SEED = 20261104;
-/** Largest random start delay of a bus when drawing or erasing, as a share of a lane. */
-const DRAW_SCATTER = 0.5;
-/** Start delay from one lane of a bus to the next when drawing or erasing, as a share of a lane. */
-const DRAW_STAGGER = 0.05;
+/** Core width of a wire, CSS pixels. */
+const LINE_PX = 1.4;
+/** Diameter of the pad at each end of a wire, CSS pixels. */
+const PAD_PX = 4.5;
+/** Half extent of the quad around a segment, CSS pixels: room for the glow of a pulse. */
+const HALO_PX = 10;
+/** Length of a pulse, world units. */
+const TAIL = 0.07;
+/** Speed of a pulse, world units per second. */
+const SPEED = { min: 0.22, max: 0.3 };
+/** Rest between two pulses on the same wire, seconds. */
+const PAUSE = { min: 2, max: 7 };
+
+/** Number of buses. */
+const BUS_COUNT = 100;
+/** Lanes per bus: parallel wires that share one route and one pulse rhythm. */
+const LANES = { min: 1, max: 1 };
+/** Distance between two lanes of a bus, world units (about 5 px at 1000 px height). */
+const LANE_PITCH = 0.009;
+/** Delay of the pulse from one lane to the next, as a fraction of the cycle. */
+const LANE_STAGGER = 0.006;
+
+/** Opacity of the three parts of a wire. Each is 0..1; the sum is clamped to 1 at the pulse head. */
+const OPACITY = {
+  /** The resting wire: a faint grey line. */
+  wire: 0.07,
+  /** How much brighter the line gets where a pulse passes. */
+  pulseLine: 0.2,
+  /** The soft glow around the line where a pulse passes; 0 removes the glow. */
+  pulseGlow: 0.2,
+};
+/** The spotlight around the pointer: lanes inside the radius get brighter. */
+const SPOTLIGHT = {
+  /** Radius, world units (0.4 is about 180 px at 1000 px height). */
+  radius: 0.4,
+  /** Extra opacity of a lane right under the pointer. */
+  opacity: 0.3,
+};
+/** Colour of the resting wire, linear RGB. */
+const WIRE_GREY = { r: 0.3, g: 0.31, b: 0.35 };
+/** How far the pulse colour is pushed from the accent towards white, 0..1. */
+const PULSE_WHITENESS = 0.2;
 
 interface Segment {
   a: THREE.Vector2;
@@ -161,17 +111,16 @@ interface Segment {
 
 interface Wire {
   segments: Segment[];
-  /** Length of the lane, world units. */
-  length: number;
   /** How far the pulse head travels per cycle: the wire, the tail, and the rest. */
   span: number;
   /** Seconds per cycle. */
   period: number;
   /** Phase of the pulse cycle, so that the buses do not pulse together. */
   seed: number;
-  /** Start delay when drawing or erasing, as a share of the lane. */
-  delay: number;
 }
+
+/** Layout seed used when the options give none. Change it to get a different set of wires. */
+const DEFAULT_SEED = 20261104;
 
 /** A small seeded generator (mulberry32), so that a layout can be reproduced. Returns [0, 1). */
 function seededRandom(seed: number): () => number {
@@ -230,50 +179,39 @@ function offsetRoute(route: THREE.Vector2[], distance: number): THREE.Vector2[] 
 }
 
 /** One lane of a bus as segments and pads. Returns the segments and the length of the lane. */
-function laneSegments(
-  points: THREE.Vector2[],
-  look: WiresLook,
-): { segments: Segment[]; length: number } {
+function laneSegments(points: THREE.Vector2[]): { segments: Segment[]; length: number } {
   const segments: Segment[] = [];
   let offset = 0;
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]!;
     const b = points[i + 1]!;
-    segments.push({ a, b, offset, widthPx: look.linePx });
+    segments.push({ a, b, offset, widthPx: LINE_PX });
     offset += a.distanceTo(b);
   }
   // Round pads at both ends, as zero-length segments.
   const first = points[0]!;
   const last = points[points.length - 1]!;
-  segments.push({ a: first, b: first, offset: 0, widthPx: look.padPx });
-  segments.push({ a: last, b: last, offset, widthPx: look.padPx });
+  segments.push({ a: first, b: first, offset: 0, widthPx: PAD_PX });
+  segments.push({ a: last, b: last, offset, widthPx: PAD_PX });
   return { segments, length: offset };
 }
 
 /**
- * One bus: parallel lanes on one route. The lanes share the speed and the rest period, so a
- * pulse runs down the whole bus, each lane a little after the one before it.
+ * One bus: 2 to 8 parallel lanes on one route. The lanes share the speed and the rest period, so
+ * a pulse runs down the whole bus, each lane a little after the one before it.
  */
-function layBus(random: () => number, look: WiresLook): Wire[] {
+function layBus(random: () => number): Wire[] {
   const route = layRoute(random);
-  const lanes = look.lanes.min + Math.floor(random() * (look.lanes.max - look.lanes.min + 1));
-  const speed = look.speed.min + random() * (look.speed.max - look.speed.min);
-  const pause = look.pause.min + random() * (look.pause.max - look.pause.min);
+  const lanes = LANES.min + Math.floor(random() * (LANES.max - LANES.min + 1));
+  const speed = SPEED.min + random() * (SPEED.max - SPEED.min);
+  const pause = PAUSE.min + random() * (PAUSE.max - PAUSE.min);
   const seed = random();
-  const busDelay = random() * DRAW_SCATTER;
   const wires: Wire[] = [];
   for (let lane = 0; lane < lanes; lane++) {
-    const points = offsetRoute(route, (lane - (lanes - 1) / 2) * look.lanePitch);
-    const { segments, length } = laneSegments(points, look);
-    const span = length + look.tail * 2 + pause * speed;
-    wires.push({
-      segments,
-      length,
-      span,
-      period: span / speed,
-      seed: seed + lane * look.laneStagger,
-      delay: busDelay + lane * DRAW_STAGGER,
-    });
+    const points = offsetRoute(route, (lane - (lanes - 1) / 2) * LANE_PITCH);
+    const { segments, length } = laneSegments(points);
+    const span = length + TAIL * 2 + pause * speed;
+    wires.push({ segments, span, period: span / speed, seed: seed + lane * LANE_STAGGER });
   }
   return wires;
 }
@@ -284,8 +222,6 @@ interface WireAttributes {
   segment: THREE.InstancedBufferAttribute;
   /** Per instance: offset along the wire, period, span, seed. */
   wire: THREE.InstancedBufferAttribute;
-  /** Per instance: lane length, draw delay. */
-  draw: THREE.InstancedBufferAttribute;
   /** Per instance: core width in CSS pixels. */
   width: THREE.InstancedBufferAttribute;
 }
@@ -294,14 +230,12 @@ function packWires(wires: Wire[]): WireAttributes {
   const count = wires.reduce((n, wire) => n + wire.segments.length, 0);
   const segment = new Float32Array(count * 4);
   const wireData = new Float32Array(count * 4);
-  const draw = new Float32Array(count * 2);
   const width = new Float32Array(count);
   let i = 0;
   for (const wire of wires) {
     for (const s of wire.segments) {
       segment.set([s.a.x, s.a.y, s.b.x, s.b.y], i * 4);
       wireData.set([s.offset, wire.period, wire.span, wire.seed], i * 4);
-      draw.set([wire.length, wire.delay], i * 2);
       width[i] = s.widthPx;
       i++;
     }
@@ -310,7 +244,6 @@ function packWires(wires: Wire[]): WireAttributes {
     count,
     segment: new THREE.InstancedBufferAttribute(segment, 4),
     wire: new THREE.InstancedBufferAttribute(wireData, 4),
-    draw: new THREE.InstancedBufferAttribute(draw, 2),
     width: new THREE.InstancedBufferAttribute(width, 1),
   };
 }
@@ -330,23 +263,11 @@ interface Uniforms {
   /** Pointer in world units, quicker to follow; centre of the spotlight. Far away when absent. */
   spotlight: ReturnType<typeof vec2Uniform>;
   motion: ReturnType<typeof floatUniform>;
-  /** Draw front: a lane is drawn where its share minus its delay is below this. */
-  draw: ReturnType<typeof floatUniform>;
-  /** Erase front: a lane is erased where its share minus its delay is below this. */
-  erase: ReturnType<typeof floatUniform>;
-  /** 1 to measure the share of a lane from its other end. */
-  flip: ReturnType<typeof floatUniform>;
 }
 
-function makeMaterial(
-  attributes: WireAttributes,
-  accent: THREE.Color,
-  look: WiresLook,
-  u: Uniforms,
-) {
+function makeMaterial(attributes: WireAttributes, accent: THREE.Color, u: Uniforms) {
   const aSegment = instancedBufferAttribute<'vec4'>(attributes.segment, 'vec4');
   const aWire = instancedBufferAttribute<'vec4'>(attributes.wire, 'vec4');
-  const aDraw = instancedBufferAttribute<'vec2'>(attributes.draw, 'vec2');
   const aWidth = instancedBufferAttribute<'float'>(attributes.width, 'float');
 
   // The quad: the segment from a to b, extended by the halo at both ends and both sides.
@@ -355,7 +276,7 @@ function makeMaterial(
   const len = length(diff);
   const dir = select(len.greaterThan(1e-5), diff.div(max(len, 1e-5)), vec2(1, 0));
   const normal = vec2(dir.y.negate(), dir.x);
-  const ext = u.pxToWorld.mul(look.haloPx);
+  const ext = u.pxToWorld.mul(HALO_PX);
   const along = uv()
     .x.mul(len.add(ext.mul(2)))
     .sub(ext);
@@ -375,40 +296,26 @@ function makeMaterial(
   const distancePx = length(rel.sub(dir.mul(onSegment))).div(u.pxToWorld);
   const halfCore = aWidth.mul(0.5);
   const core = smoothstep(halfCore.sub(0.4), halfCore.add(0.6), distancePx).oneMinus();
-  const halo = smoothstep(0, look.haloPx, distancePx).oneMinus().pow(2);
+  const halo = smoothstep(0, HALO_PX, distancePx).oneMinus().pow(2);
 
   // The pulse: a head that runs along the wire with an exponential tail, then rests.
   const t = time.mul(u.motion);
   const alongWire = aWire.x.add(onSegment);
   const cycle = fract(t.div(aWire.y).add(aWire.w));
-  const head = cycle.mul(aWire.z).sub(look.tail);
+  const head = cycle.mul(aWire.z).sub(TAIL);
   const behind = head.sub(alongWire);
-  const travelling = exp(max(behind, 0).div(-look.tail)).mul(step(0, behind)).mul(u.motion);
+  const pulse = exp(max(behind, 0).div(-TAIL)).mul(step(0, behind)).mul(u.motion);
 
-  // Drawing and erasing: the share of the lane behind this fragment, with the lane's delay, is
-  // compared with the two fronts. The drawing tip glows like a pulse head.
-  const laneLength = aDraw.x;
-  const shareRaw = alongWire.div(laneLength);
-  const share = mix(shareRaw, shareRaw.oneMinus(), u.flip).add(aDraw.y);
-  const drawn = step(share, u.draw).mul(step(u.erase, share));
-  const behindTip = u.draw.sub(share).mul(laneLength);
-  const tip = exp(max(behindTip, 0).div(-look.tail)).mul(step(0, behindTip));
-  const pulse = max(travelling, tip);
-
-  const grey = vec3(look.grey.r, look.grey.g, look.grey.b);
-  const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), look.pulseWhiteness);
+  const grey = vec3(WIRE_GREY.r, WIRE_GREY.g, WIRE_GREY.b);
+  const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), PULSE_WHITENESS);
   // The spotlight: 1 under the pointer, 0 at the radius, smooth in between.
-  const nearPointer = smoothstep(
-    0,
-    look.spotlight.radius,
-    length(point.sub(u.spotlight)),
-  ).oneMinus();
+  const nearPointer = smoothstep(0, SPOTLIGHT.radius, length(point.sub(u.spotlight))).oneMinus();
 
-  const restingLine = core.mul(look.opacity.wire);
-  const litLine = core.mul(nearPointer).mul(look.spotlight.opacity);
-  const pulseLine = core.mul(pulse).mul(look.opacity.pulseLine);
-  const pulseGlow = halo.mul(pulse).mul(look.opacity.pulseGlow);
-  const alpha = clamp(restingLine.add(litLine).add(pulseLine).add(pulseGlow), 0, 1).mul(drawn);
+  const restingLine = core.mul(OPACITY.wire);
+  const litLine = core.mul(nearPointer).mul(SPOTLIGHT.opacity);
+  const pulseLine = core.mul(pulse).mul(OPACITY.pulseLine);
+  const pulseGlow = halo.mul(pulse).mul(OPACITY.pulseGlow);
+  const alpha = clamp(restingLine.add(litLine).add(pulseLine).add(pulseGlow), 0, 1);
   const rgb = mix(grey, glow, clamp(pulse.mul(1.5), 0, 1));
   // Premultiplied, for the max blending below.
   material.colorNode = vec4(rgb.mul(alpha), alpha);
@@ -431,12 +338,6 @@ export async function startWires(
   canvas: HTMLCanvasElement,
   options: WiresOptions,
 ): Promise<WiresHandle> {
-  const look: WiresLook = { ...BACKGROUND_LOOK, ...options.look };
-  const interactive = options.interactive ?? true;
-  const loop = options.loop ?? true;
-  // A lane with the largest delay is complete when the front reaches this value.
-  const reach = 1 + DRAW_SCATTER + (look.lanes.max - 1) * DRAW_STAGGER;
-
   const renderer = new THREE.WebGPURenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0);
@@ -451,15 +352,11 @@ export async function startWires(
     pointer: vec2Uniform(new THREE.Vector2()),
     spotlight: vec2Uniform(new THREE.Vector2(FAR, FAR)),
     motion: floatUniform(options.reducedMotion ? 0 : 1),
-    // Far beyond the end of every lane, so that the drawing tip is out of sight by default.
-    draw: floatUniform(reach + 100),
-    erase: floatUniform(-1),
-    flip: floatUniform(0),
   };
   const random = seededRandom(options.seed ?? DEFAULT_SEED);
-  const wires = Array.from({ length: look.buses }, () => layBus(random, look)).flat();
+  const wires = Array.from({ length: options.count ?? BUS_COUNT }, () => layBus(random)).flat();
   const attributes = packWires(wires);
-  const material = makeMaterial(attributes, new THREE.Color(options.accent), look, uniforms);
+  const material = makeMaterial(attributes, new THREE.Color(options.accent), uniforms);
   const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, attributes.count);
   mesh.frustumCulled = false;
   scene.add(mesh);
@@ -478,7 +375,6 @@ export async function startWires(
 
   const resize = () => {
     const { clientWidth: w, clientHeight: h } = canvas;
-    if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
     camera.left = -w / h;
     camera.right = w / h;
@@ -496,7 +392,7 @@ export async function startWires(
     renderOnce();
   };
   const start = () => {
-    if (running || options.reducedMotion || !loop) return;
+    if (running || options.reducedMotion) return;
     running = true;
     void renderer.setAnimationLoop(frame);
   };
@@ -510,31 +406,15 @@ export async function startWires(
   const visible = new IntersectionObserver(([entry]) => (entry?.isIntersecting ? start() : stop()));
 
   window.addEventListener('resize', resize);
-  if (interactive) {
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    document.addEventListener('pointerleave', onPointerLeave);
-  }
-  if (loop) {
-    document.addEventListener('visibilitychange', onVisibility);
-    visible.observe(canvas);
-    renderOnce();
-    start();
-  }
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.addEventListener('pointerleave', onPointerLeave);
+  document.addEventListener('visibilitychange', onVisibility);
+  visible.observe(canvas);
+
+  renderOnce();
+  start();
 
   return {
-    render() {
-      resize();
-      renderOnce();
-    },
-    setDraw(progress) {
-      uniforms.draw.value = progress * reach;
-    },
-    setErase(progress) {
-      uniforms.erase.value = progress * reach;
-    },
-    setFlip(flip) {
-      uniforms.flip.value = flip ? 1 : 0;
-    },
     dispose() {
       stop();
       visible.disconnect();

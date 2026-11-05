@@ -1,9 +1,9 @@
 ---
 /**
- * Page transition: the wires of the background, denser and brighter, drawn lane by lane over
- * an ink backdrop. Hooks into Astro's client-side navigation: the lanes cover the page before
- * the swap and are erased after it. Links with `data-nav="back"` and browser back navigation
- * run the lanes from their other end.
+ * Shader page transition made of lanes, like the wires of the background. Hooks into Astro's
+ * client-side navigation: the lanes cover the page before the swap and leave after it. Links
+ * with `data-nav="back"` and browser back navigation sweep from the right; everything else
+ * sweeps from the left.
  *
  * Without a GPU, or under `prefers-reduced-motion`, Astro's default transition is used.
  */
@@ -33,9 +33,12 @@
     try {
       const { startPageCurtain } = await import('../gfx/pageCurtain');
       const styles = getComputedStyle(document.documentElement);
+      const theme = (name: string, fallback: string) =>
+        cssColorToHex(styles.getPropertyValue(name).trim(), fallback);
       curtain = await startPageCurtain(canvas, {
-        backdrop: styles.getPropertyValue('--color-ink').trim() || '#15171e',
-        accent: cssColorToHex(styles.getPropertyValue('--color-accent').trim(), '#a9d5b5'),
+        color: theme('--color-ink', '#15171e'),
+        lineColor: theme('--color-muted', '#a7a9b3'),
+        pulseColor: theme('--color-accent', '#a9d5b5'),
       });
       // The curtain replaces Astro's default cross-fade.
       document.documentElement.dataset.curtain = '';
