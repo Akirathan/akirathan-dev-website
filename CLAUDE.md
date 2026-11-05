@@ -124,9 +124,11 @@ Whenever making changes to the text content, you can commit, but ensure that the
   Use JavaScript only when CSS cannot do it.
 - The site uses Astro's `<ClientRouter />` (client-side navigation). A component `<script>`
   therefore runs once per visit, not once per page: start work in an `astro:page-load` listener
-  and dispose it in `astro:before-swap`. See `Background.astro` and `PhotoSwipe.astro`.
-  `PageCurtain.astro` is the shader page transition; links with `data-nav="back"` sweep from
-  the right.
+  and dispose it in `astro:before-swap`. See `PhotoSwipe.astro`. `Background.astro` is the
+  exception: its canvas has `transition:persist`, so the wires (`src/gfx/wires.ts`) run across
+  navigations; `<body data-background="full|quiet">` picks the mode per page, and every
+  navigation plays the wire burst (`astro:before-preparation`). Page content uses Astro's
+  default cross-fade.
 - Content (text, project entries, links) belongs in content collections, not hard-coded deep
   inside visual components. Articles are **MDX** files in `src/content/experience/` and
   `src/content/topics/`, validated by the schemas in `src/content.config.ts`. MDX lets an

@@ -1,21 +1,23 @@
 ---
 /**
- * Fixed full-page background. A CSS gradient is always present; the Three.js wires are
- * layered on top once they have loaded, and only when the browser can run them.
+ * Fixed full-page background. A CSS gradient is always present; the Three.js wires are layered
+ * on top once they have loaded, and only when the browser can run them.
  *
- * `quiet` is for reading pages: the same wires and the pointer spotlight, but no pulses.
+ * The canvas persists across client-side navigation, so the wires never restart. The page says
+ * which mode it wants through `data-background` on <body>: "full" runs the resting pulses,
+ * "quiet" (reading pages) keeps only the lanes and the pointer spotlight. Every navigation plays
+ * the burst from the centre of the screen.
  */
-interface Props {
-  quiet?: boolean;
-}
-const { quiet = false } = Astro.props;
 ---
 
-<div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+<div
+  transition:persist="wires"
+  aria-hidden="true"
+  class="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+>
   <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--color-ink-soft),_var(--color-ink)_60%)]"></div>
   <canvas
     data-wires
-    data-quiet={quiet ? '' : undefined}
     class="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-1000 data-ready:opacity-100"
   ></canvas>
 </div>
@@ -25,14 +27,21 @@ const { quiet = false } = Astro.props;
 
   const canRender = () =>
     'gpu' in navigator || !!document.createElement('canvas').getContext('webgl2');
+  const wantsPulses = () => document.body.dataset.background !== 'quiet';
 
   let handle: WiresHandle | null = null;
+  let starting = false;
 
-  // With client-side navigation this script runs once, so start per page and clean up
-  // before each swap.
+  // The canvas persists across navigations, so the wires start once per visit. Each page only
+  // switches the resting pulses on or off.
   const start = async () => {
+    if (handle) {
+      handle.setPulses(wantsPulses());
+      return;
+    }
     const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-wires]');
-    if (!canvas || !canRender()) return;
+    if (!canvas || !canRender() || starting) return;
+    starting = true;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     try {
       const [{ startWires }, { themeColorHex }] = await Promise.all([
@@ -40,12 +49,13 @@ const { quiet = false } = Astro.props;
         import('../gfx/cssColor'),
       ]);
       const accent = themeColorHex('--color-accent', '#a9d5b5');
-      const pulses = canvas.dataset.quiet === undefined;
-      handle = await startWires(canvas, { reducedMotion, accent, pulses });
+      handle = await startWires(canvas, { reducedMotion, accent, pulses: wantsPulses() });
       canvas.dataset.ready = '';
     } catch (error) {
       // The gradient stays. Nothing else to do.
       console.warn('Wire background disabled:', error);
+    } finally {
+      starting = false;
     }
   };
 
@@ -58,8 +68,5 @@ const { quiet = false } = Astro.props;
   };
 
   document.addEventListener('astro:page-load', schedule);
-  document.addEventListener('astro:before-swap', () => {
-    handle?.dispose();
-    handle = null;
-  });
+  document.addEventListener('astro:before-preparation', () => handle?.burst());
 </script>

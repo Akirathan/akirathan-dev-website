@@ -49,12 +49,6 @@
   ::selection {
     @apply bg-accent/30;
   }
-
-  /* The shader curtain (PageCurtain.astro) replaces the default cross-fade once it is ready. */
-  html[data-curtain]::view-transition-old(root),
-  html[data-curtain]::view-transition-new(root) {
-    animation: none;
-  }
 }
 
 @utility reveal {

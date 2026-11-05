@@ -1,6 +1,7 @@
 /**
- * Wire background for the landing page: thin grey traces that run across the screen like the
- * copper of a circuit board, each with a signal pulse now and then.
+ * Wire background of every page: thin grey traces that run across the screen like the copper
+ * of a circuit board, each with a signal pulse now and then. On navigation they play a burst:
+ * long bright pulses that leave a circle at the centre of the screen.
  *
  * Three.js WebGPURenderer: WebGPU where available, WebGL2 otherwise. The wires are laid out once
  * on the CPU as buses: a route of straight segments with 45° turns, copied into 2 to 8 parallel
@@ -111,8 +112,33 @@ export const BACKGROUND_LOOK: WiresLook = {
 };
 
 export interface WiresHandle {
+  /** Switch the resting pulses on or off, for example when the page changes. */
+  setPulses(enabled: boolean): void;
+  /**
+   * Play the navigation burst: the resting pulses fade out, and long bright pulses leave the
+   * circle at the centre of the screen along every lane that crosses it. See `BURST`.
+   */
+  burst(): void;
   dispose(): void;
 }
+
+/** The navigation burst. Distances are world units; the screen is 2 units high. */
+export const BURST = {
+  /** Length of the whole burst, milliseconds. */
+  ms: 2000,
+  /** Radius of the circle at the centre of the screen where the pulses start. */
+  radius: 0.22,
+  /** How far a pulse travels from the circle before it vanishes, as at a lane end. */
+  travel: 0.3,
+  /** Length of a burst pulse. The resting pulses use `WiresLook.tail`. */
+  tail: 0.2,
+  /** Width of a burst pulse, as a multiple of the line width. */
+  width: 2.4,
+  /** Opacity of the line and of the glow under a burst pulse. */
+  opacity: { line: 0.9, glow: 0.5 },
+  /** How fast the resting pulses fade when the burst starts, per frame. */
+  fade: 0.12,
+};
 
 // ---------------------------------------------------------------------------------------------
 // Layout
@@ -139,6 +165,10 @@ interface Wire {
   period: number;
   /** Phase of the pulse cycle, so that the buses do not pulse together. */
   seed: number;
+  /** Distance along the lane where it leaves the burst circle, or -1. A burst pulse runs on. */
+  burstOut: number;
+  /** Distance along the lane where it enters the burst circle, or -1. A burst pulse runs back. */
+  burstIn: number;
 }
 
 /** Layout seed used when the options give none. Change it to get a different set of wires. */
@@ -200,6 +230,40 @@ function offsetRoute(route: THREE.Vector2[], distance: number): THREE.Vector2[] 
   });
 }
 
+/**
+ * Where a lane crosses the burst circle: the first point where it leaves the circle, and the
+ * first point where it enters it, as distances along the lane. -1 when there is no such point.
+ */
+function burstCrossings(points: THREE.Vector2[]): { out: number; in: number } {
+  const r2 = BURST.radius * BURST.radius;
+  let out = -1;
+  let into = -1;
+  let offset = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]!;
+    const d = points[i + 1]!.clone().sub(a);
+    const len = d.length();
+    // |a + t d|² = r²  ->  (d·d) t² + 2 (a·d) t + (a·a - r²) = 0
+    const qa = d.dot(d);
+    const qb = 2 * a.dot(d);
+    const qc = a.dot(a) - r2;
+    const disc = qb * qb - 4 * qa * qc;
+    if (qa > 0 && disc >= 0) {
+      const root = Math.sqrt(disc);
+      for (const t of [(-qb - root) / (2 * qa), (-qb + root) / (2 * qa)]) {
+        if (t < 0 || t > 1) continue;
+        const hit = a.clone().addScaledVector(d, t);
+        const leaving = hit.dot(d) > 0;
+        const s = offset + t * len;
+        if (leaving && out < 0) out = s;
+        if (!leaving && into < 0) into = s;
+      }
+    }
+    offset += len;
+  }
+  return { out, in: into };
+}
+
 /** One lane of a bus as segments and pads. Returns the segments and the length of the lane. */
 function laneSegments(
   points: THREE.Vector2[],
@@ -236,7 +300,15 @@ function layBus(random: () => number, look: WiresLook): Wire[] {
     const points = offsetRoute(route, (lane - (lanes - 1) / 2) * look.lanePitch);
     const { segments, length } = laneSegments(points, look);
     const span = length + look.tail * 2 + pause * speed;
-    wires.push({ segments, span, period: span / speed, seed: seed + lane * look.laneStagger });
+    const crossings = burstCrossings(points);
+    wires.push({
+      segments,
+      span,
+      period: span / speed,
+      seed: seed + lane * look.laneStagger,
+      burstOut: crossings.out,
+      burstIn: crossings.in,
+    });
   }
   return wires;
 }
@@ -247,6 +319,8 @@ interface WireAttributes {
   segment: THREE.InstancedBufferAttribute;
   /** Per instance: offset along the wire, period, span, seed. */
   wire: THREE.InstancedBufferAttribute;
+  /** Per instance: burst start running on, burst start running back; -1 = none. */
+  burst: THREE.InstancedBufferAttribute;
   /** Per instance: core width in CSS pixels. */
   width: THREE.InstancedBufferAttribute;
 }
@@ -255,12 +329,14 @@ function packWires(wires: Wire[]): WireAttributes {
   const count = wires.reduce((n, wire) => n + wire.segments.length, 0);
   const segment = new Float32Array(count * 4);
   const wireData = new Float32Array(count * 4);
+  const burst = new Float32Array(count * 2);
   const width = new Float32Array(count);
   let i = 0;
   for (const wire of wires) {
     for (const s of wire.segments) {
       segment.set([s.a.x, s.a.y, s.b.x, s.b.y], i * 4);
       wireData.set([s.offset, wire.period, wire.span, wire.seed], i * 4);
+      burst.set([wire.burstOut, wire.burstIn], i * 2);
       width[i] = s.widthPx;
       i++;
     }
@@ -269,6 +345,7 @@ function packWires(wires: Wire[]): WireAttributes {
     count,
     segment: new THREE.InstancedBufferAttribute(segment, 4),
     wire: new THREE.InstancedBufferAttribute(wireData, 4),
+    burst: new THREE.InstancedBufferAttribute(burst, 2),
     width: new THREE.InstancedBufferAttribute(width, 1),
   };
 }
@@ -288,8 +365,10 @@ interface Uniforms {
   /** Pointer in world units, quicker to follow; centre of the spotlight. Far away when absent. */
   spotlight: ReturnType<typeof vec2Uniform>;
   motion: ReturnType<typeof floatUniform>;
-  /** 1 with pulses, 0 without. */
+  /** Gain of the resting pulses: 1 with pulses, 0 without, in between while they fade. */
   pulses: ReturnType<typeof floatUniform>;
+  /** Seconds since the burst started, or -1 when no burst runs. */
+  burstTime: ReturnType<typeof floatUniform>;
 }
 
 function makeMaterial(
@@ -300,6 +379,7 @@ function makeMaterial(
 ) {
   const aSegment = instancedBufferAttribute<'vec4'>(attributes.segment, 'vec4');
   const aWire = instancedBufferAttribute<'vec4'>(attributes.wire, 'vec4');
+  const aBurst = instancedBufferAttribute<'vec2'>(attributes.burst, 'vec2');
   const aWidth = instancedBufferAttribute<'float'>(attributes.width, 'float');
 
   // The quad: the segment from a to b, extended by the halo at both ends and both sides.
@@ -329,6 +409,8 @@ function makeMaterial(
   const halfCore = aWidth.mul(0.5);
   const core = smoothstep(halfCore.sub(0.4), halfCore.add(0.6), distancePx).oneMinus();
   const halo = smoothstep(0, look.haloPx, distancePx).oneMinus().pow(2);
+  const wideHalf = halfCore.mul(BURST.width);
+  const wideCore = smoothstep(wideHalf.sub(0.4), wideHalf.add(0.6), distancePx).oneMinus();
 
   // The pulse: a head that runs along the wire with an exponential tail, then rests.
   const t = time.mul(u.motion);
@@ -336,10 +418,33 @@ function makeMaterial(
   const cycle = fract(t.div(aWire.y).add(aWire.w));
   const head = cycle.mul(aWire.z).sub(look.tail);
   const behind = head.sub(alongWire);
-  const pulse = exp(max(behind, 0).div(-look.tail))
+  const resting = exp(max(behind, 0).div(-look.tail))
     .mul(step(0, behind))
     .mul(u.motion)
     .mul(u.pulses);
+
+  // The burst: from where the lane leaves the circle a pulse runs on; from where it enters, a
+  // pulse runs back. Each lives only up to `travel` from its start and then vanishes, as at a
+  // lane end: the head passes the limit and the tail slides out after it.
+  const burstSpeed = (look.speed.min + look.speed.max) / 2;
+  const burstHead = u.burstTime.mul(burstSpeed);
+  const exists = (start: THREE.Node<'float'>) => step(0, start);
+  const onward = aBurst.x;
+  const behindOn = onward.add(burstHead).sub(alongWire);
+  const withinOn = step(onward, alongWire).mul(step(alongWire, onward.add(BURST.travel)));
+  const burstOn = exp(max(behindOn, 0).div(-BURST.tail))
+    .mul(step(0, behindOn))
+    .mul(withinOn)
+    .mul(exists(onward));
+  const backward = aBurst.y;
+  const behindBack = alongWire.sub(backward.sub(burstHead));
+  const withinBack = step(alongWire, backward).mul(step(backward.sub(BURST.travel), alongWire));
+  const burstBack = exp(max(behindBack, 0).div(-BURST.tail))
+    .mul(step(0, behindBack))
+    .mul(withinBack)
+    .mul(exists(backward));
+  const burst = max(burstOn, burstBack).mul(step(0, u.burstTime));
+  const pulse = max(resting, burst);
 
   const grey = vec3(look.grey.r, look.grey.g, look.grey.b);
   const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), look.pulseWhiteness);
@@ -352,8 +457,14 @@ function makeMaterial(
 
   const restingLine = core.mul(look.opacity.wire);
   const litLine = core.mul(nearPointer).mul(look.spotlight.opacity);
-  const pulseLine = core.mul(pulse).mul(look.opacity.pulseLine);
-  const pulseGlow = halo.mul(pulse).mul(look.opacity.pulseGlow);
+  const pulseLine = core
+    .mul(resting)
+    .mul(look.opacity.pulseLine)
+    .add(wideCore.mul(burst).mul(BURST.opacity.line));
+  const pulseGlow = halo
+    .mul(resting)
+    .mul(look.opacity.pulseGlow)
+    .add(halo.mul(burst).mul(BURST.opacity.glow));
   const alpha = clamp(restingLine.add(litLine).add(pulseLine).add(pulseGlow), 0, 1);
   const rgb = mix(grey, glow, clamp(pulse.mul(1.5), 0, 1));
   // Premultiplied, for the max blending below.
@@ -394,7 +505,11 @@ export async function startWires(
     spotlight: vec2Uniform(new THREE.Vector2(FAR, FAR)),
     motion: floatUniform(options.reducedMotion ? 0 : 1),
     pulses: floatUniform(options.pulses === false ? 0 : 1),
+    burstTime: floatUniform(-1),
   };
+  let pulsesEnabled = options.pulses !== false;
+  /** `performance.now()` when the burst started, or -1. */
+  let burstStart = -1;
   const random = seededRandom(options.seed ?? DEFAULT_SEED);
   const wires = Array.from({ length: look.buses }, () => layBus(random, look)).flat();
   const attributes = packWires(wires);
@@ -431,6 +546,13 @@ export async function startWires(
   const frame = () => {
     uniforms.pointer.value.lerp(targetPointer, 0.04);
     uniforms.spotlight.value.lerp(targetSpotlight, 0.2);
+    const bursting = burstStart >= 0 && performance.now() - burstStart < BURST.ms;
+    if (!bursting) burstStart = -1;
+    uniforms.burstTime.value = bursting ? (performance.now() - burstStart) / 1000 : -1;
+    // The resting pulses fade out for the burst and come back after it.
+    const gainTarget = pulsesEnabled && !bursting ? 1 : 0;
+    const gain = uniforms.pulses.value;
+    uniforms.pulses.value = gain + (gainTarget - gain) * BURST.fade;
     renderOnce();
   };
   const start = () => {
@@ -457,6 +579,13 @@ export async function startWires(
   start();
 
   return {
+    setPulses(enabled) {
+      pulsesEnabled = enabled;
+    },
+    burst() {
+      if (options.reducedMotion) return;
+      burstStart = performance.now();
+    },
     dispose() {
       stop();
       visible.disconnect();
