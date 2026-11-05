@@ -95,7 +95,7 @@ export interface WiresLook {
 
 /** The look of the landing-page background. */
 export const BACKGROUND_LOOK: WiresLook = {
-  buses: 100,
+  buses: 140,
   lanes: { min: 1, max: 1 },
   lanePitch: 0.009,
   linePx: 1.4,
