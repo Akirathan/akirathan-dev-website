@@ -11,7 +11,7 @@ import portrait from '../assets/portrait.jpg';
 interface Props {
   title?: string;
   description?: string;
-  /** Render the animated wire background. Detail pages keep only the static gradient. */
+  /** Full wire background with pulses, for the landing page. Other pages get the quiet one. */
   animatedBackground?: boolean;
 }
 
@@ -48,14 +48,7 @@ const ogImageUrl = new URL(ogImage.src, Astro.site);
     <ClientRouter />
   </head>
   <body class="flex min-h-dvh flex-col">
-    {animatedBackground ? (
-      <Background />
-    ) : (
-      <div
-        aria-hidden="true"
-        class="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--color-ink-soft),_var(--color-ink)_60%)]"
-      />
-    )}
+    <Background quiet={!animatedBackground} />
     <PageCurtain />
     <Header />
     <main class="flex-1">

@@ -2,13 +2,20 @@
 /**
  * Fixed full-page background. A CSS gradient is always present; the Three.js wires are
  * layered on top once they have loaded, and only when the browser can run them.
+ *
+ * `quiet` is for reading pages: the same wires and the pointer spotlight, but no pulses.
  */
+interface Props {
+  quiet?: boolean;
+}
+const { quiet = false } = Astro.props;
 ---
 
 <div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
   <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--color-ink-soft),_var(--color-ink)_60%)]"></div>
   <canvas
     data-wires
+    data-quiet={quiet ? '' : undefined}
     class="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-1000 data-ready:opacity-100"
   ></canvas>
 </div>
@@ -33,7 +40,8 @@
         import('../gfx/cssColor'),
       ]);
       const accent = themeColorHex('--color-accent', '#a9d5b5');
-      handle = await startWires(canvas, { reducedMotion, accent });
+      const pulses = canvas.dataset.quiet === undefined;
+      handle = await startWires(canvas, { reducedMotion, accent, pulses });
       canvas.dataset.ready = '';
     } catch (error) {
       // The gradient stays. Nothing else to do.

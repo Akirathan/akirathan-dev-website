@@ -44,6 +44,8 @@ export interface WiresOptions {
   seed?: number;
   /** Changes to the look. Give whole sub-objects, for example the whole `opacity`. */
   look?: Partial<WiresLook>;
+  /** Run the signal pulses. Default true. With false the wires rest; the spotlight still works. */
+  pulses?: boolean;
 }
 
 /** Everything that decides how the wires look and behave. See `BACKGROUND_LOOK` for values. */
@@ -286,6 +288,8 @@ interface Uniforms {
   /** Pointer in world units, quicker to follow; centre of the spotlight. Far away when absent. */
   spotlight: ReturnType<typeof vec2Uniform>;
   motion: ReturnType<typeof floatUniform>;
+  /** 1 with pulses, 0 without. */
+  pulses: ReturnType<typeof floatUniform>;
 }
 
 function makeMaterial(
@@ -332,7 +336,10 @@ function makeMaterial(
   const cycle = fract(t.div(aWire.y).add(aWire.w));
   const head = cycle.mul(aWire.z).sub(look.tail);
   const behind = head.sub(alongWire);
-  const pulse = exp(max(behind, 0).div(-look.tail)).mul(step(0, behind)).mul(u.motion);
+  const pulse = exp(max(behind, 0).div(-look.tail))
+    .mul(step(0, behind))
+    .mul(u.motion)
+    .mul(u.pulses);
 
   const grey = vec3(look.grey.r, look.grey.g, look.grey.b);
   const glow = mix(vec3(accent.r, accent.g, accent.b), vec3(1), look.pulseWhiteness);
@@ -386,6 +393,7 @@ export async function startWires(
     pointer: vec2Uniform(new THREE.Vector2()),
     spotlight: vec2Uniform(new THREE.Vector2(FAR, FAR)),
     motion: floatUniform(options.reducedMotion ? 0 : 1),
+    pulses: floatUniform(options.pulses === false ? 0 : 1),
   };
   const random = seededRandom(options.seed ?? DEFAULT_SEED);
   const wires = Array.from({ length: look.buses }, () => layBus(random, look)).flat();
