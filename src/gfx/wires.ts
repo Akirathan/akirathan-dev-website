@@ -128,7 +128,7 @@ export const BURST = {
   /** Length of the whole burst, milliseconds. */
   ms: 1000,
   /** Radius of the circle at the centre of the screen where the pulses start. */
-  radius: 0.22,
+  radius: 0.15,
   /** How far a pulse travels from the circle before it vanishes, as at a lane end. */
   travel: 0.2,
   /** Length of a burst pulse. The resting pulses use `WiresLook.tail`. */
