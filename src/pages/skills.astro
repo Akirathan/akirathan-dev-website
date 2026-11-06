@@ -31,27 +31,21 @@ const usedAt = await usedAtBySkill();
               const jobs = usedAt.get(skill.slug) ?? [];
               return (
                 <li class="flex flex-col items-start gap-1">
-                  <SkillChip skill={skill} target size="md" />
-                  {(skill.note || jobs.length > 0) && (
+                  <SkillChip skill={skill} target size="md" expertise />
+                  {jobs.length > 0 && (
                     <p class="pl-1 text-sm text-muted">
-                      {skill.note}
-                      {skill.note && jobs.length > 0 && ' '}
-                      {jobs.length > 0 && (
+                      Used at{' '}
+                      {jobs.map((job, i) => (
                         <>
-                          Used at{' '}
-                          {jobs.map((job, i) => (
-                            <>
-                              <a
-                                href={`/work/${job.id}`}
-                                class="text-paper/80 hover:text-accent hover:underline"
-                              >
-                                {job.company}
-                              </a>
-                              {i < jobs.length - 1 ? ', ' : '.'}
-                            </>
-                          ))}
+                          <a
+                            href={`/work/${job.id}`}
+                            class="text-paper/80 hover:text-accent hover:underline"
+                          >
+                            {job.company}
+                          </a>
+                          {i < jobs.length - 1 ? ', ' : '.'}
                         </>
-                      )}
+                      ))}
                     </p>
                   )}
                 </li>

@@ -9,59 +9,74 @@ import { hasArticle } from '../data/skillContent';
  * A skill with a note in `src/content/skills/` links to that note from everywhere. Without a
  * note, the chip links to its place on /skills; on /skills itself (`target` prop) it is the
  * link target and highlights when addressed by the URL fragment.
+ *
+ * With `expertise`, a skill that has an expertise value shows it as a meter of 10 segments
+ * under the label (CSS fill animation: `.meter-on` in global.css).
  */
 interface Props {
   skill: Skill;
   target?: boolean;
   size?: 'sm' | 'md';
+  expertise?: boolean;
 }
 
-const { skill, target = false, size = 'sm' } = Astro.props;
+const { skill, target = false, size = 'sm', expertise: showExpertise = false } = Astro.props;
 const article = await hasArticle(skill);
 const icon = skillIcon(skill);
+const level = showExpertise ? skill.expertise : undefined;
 
-const base = 'inline-flex items-center gap-1.5 rounded-full border transition-colors';
-const sizeClass = size === 'md' ? 'px-4 py-1.5 text-sm' : 'px-3 py-1 text-xs';
+const href = article ? skillArticleHref(skill) : target ? undefined : skillHref(skill);
+const Tag = href ? 'a' : 'span';
+
+const shape =
+  level !== undefined
+    ? 'inline-flex flex-col items-start gap-2 rounded-xl px-4 py-2.5 text-sm'
+    : size === 'md'
+      ? 'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm'
+      : 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs';
 const iconClass = size === 'md' ? '-ml-1.5 size-5' : '-ml-1 size-4';
 const highlight = 'target:border-accent target:bg-accent/15 target:text-paper';
+const tone = article
+  ? 'border-paper/25 text-paper/90 hover:border-accent hover:bg-accent/10 hover:text-paper'
+  : target
+    ? 'border-paper/15 text-paper/85'
+    : 'border-paper/15 text-muted hover:border-accent/60 hover:text-paper';
 ---
 
-{article ? (
-  <a
-    id={target ? skill.slug : undefined}
-    href={skillArticleHref(skill)}
-    class:list={[
-      base,
-      sizeClass,
-      target && 'scroll-mt-28',
-      target && highlight,
-      'border-paper/25 text-paper/90 hover:border-accent hover:bg-accent/10 hover:text-paper',
-    ]}
-  >
+<Tag
+  id={target ? skill.slug : undefined}
+  href={href}
+  class:list={[
+    'border transition-colors',
+    shape,
+    tone,
+    target && 'scroll-mt-28',
+    target && highlight,
+  ]}
+>
+  <span class="inline-flex items-center gap-1.5">
     {icon && <Image src={icon} alt="" width={40} height={40} class={iconClass} />}
     {skill.label}
-    <span aria-hidden="true" class="-mr-1 text-accent">
-      →
-    </span>
-  </a>
-) : target ? (
-  <span
-    id={skill.slug}
-    class:list={[base, sizeClass, 'scroll-mt-28 border-paper/15 text-paper/85', highlight]}
-  >
-    {icon && <Image src={icon} alt="" width={40} height={40} class={iconClass} />}
-    {skill.label}
+    {article && (
+      <span aria-hidden="true" class="-mr-1 text-accent">
+        →
+      </span>
+    )}
   </span>
-) : (
-  <a
-    href={skillHref(skill)}
-    class:list={[
-      base,
-      sizeClass,
-      'border-paper/15 text-muted hover:border-accent/60 hover:text-paper',
-    ]}
-  >
-    {icon && <Image src={icon} alt="" width={40} height={40} class={iconClass} />}
-    {skill.label}
-  </a>
-)}
+  {level !== undefined && (
+    <span class="flex items-center gap-2.5">
+      <span aria-hidden="true" class="flex gap-0.5">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span
+            class:list={['h-2 w-2.5 rounded-[2px]', i < level ? 'meter-on' : 'bg-paper/12']}
+            style={`--i: ${i}`}
+          />
+        ))}
+      </span>
+      <span class="text-xs text-muted tabular-nums">
+        <span class="sr-only">Expertise </span>
+        {level}/10
+      </span>
+    </span>
+  )}
+</Tag>

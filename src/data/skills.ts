@@ -12,8 +12,10 @@ export interface Skill {
    * `src/content/skills/`, and of an optional icon in `src/assets/skills/`.
    */
   slug: string;
-  /** One short line, optional. */
+  /** One short line, optional. Shown as the tagline of the long-form note. */
   note?: string;
+  /** Self-assessed expertise, an integer from 1 to 10. Shown as a meter in the chip on /skills. */
+  expertise?: number;
 }
 
 export interface SkillCategory {
@@ -83,6 +85,17 @@ export const skillCategories: SkillCategory[] = [
 ];
 
 export const skills: Skill[] = skillCategories.flatMap((c) => c.skills);
+
+for (const s of skills) {
+  if (
+    s.expertise !== undefined &&
+    !(Number.isInteger(s.expertise) && s.expertise >= 1 && s.expertise <= 10)
+  ) {
+    throw new Error(
+      `Skill "${s.label}": expertise must be an integer from 1 to 10, got ${s.expertise}.`,
+    );
+  }
+}
 
 const byLabel = new Map(skills.map((s) => [s.label, s]));
 
