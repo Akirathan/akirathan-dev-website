@@ -27,15 +27,15 @@ export const skillCategories: SkillCategory[] = [
   {
     title: 'Languages',
     skills: [
-      { label: 'Java', slug: 'java', note: 'The language I am fastest in.' },
-      { label: 'Scala', slug: 'scala' },
-      { label: 'R', slug: 'r', note: 'Implemented it, not only used it.' },
-      { label: 'Python', slug: 'python' },
+      { label: 'Java', slug: 'java', note: 'The language I am fastest in.', expertise: 9 },
+      { label: 'Scala', slug: 'scala', expertise: 7 },
+      { label: 'R', slug: 'r', note: 'Implemented it, not only used it.', expertise: 8 },
+      { label: 'Python', slug: 'python', expertise: 7 },
       { label: 'C', slug: 'c' },
-      { label: 'C++', slug: 'cpp' },
-      { label: 'Rust', slug: 'rust' },
-      { label: 'TypeScript', slug: 'typescript' },
-      { label: 'Liquid', slug: 'liquid' },
+      { label: 'C++', slug: 'cpp', expertise: 5 },
+      { label: 'Rust', slug: 'rust', expertise: 7 },
+      { label: 'TypeScript', slug: 'typescript', expertise: 7 },
+      { label: 'Liquid', slug: 'liquid', expertise: 8 },
     ],
   },
   {
