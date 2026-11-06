@@ -1,10 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import SkillChip from '../components/SkillChip.astro';
+import SkillCard from '../components/SkillCard.astro';
 import { skillCategories } from '../data/skills';
 import { usedAtBySkill } from '../data/skillContent';
 
-// Which work entries mention each skill, for the "used at" line under a chip.
+// Which work entries mention each skill, for the "used at" line in each card.
 const usedAt = await usedAtBySkill();
 ---
 
@@ -26,31 +26,12 @@ const usedAt = await usedAtBySkill();
       {skillCategories.map((category) => (
         <section>
           <h2 class="text-xl font-semibold text-accent">{category.title}</h2>
-          <ul class="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-            {category.skills.map((skill) => {
-              const jobs = usedAt.get(skill.slug) ?? [];
-              return (
-                <li class="flex flex-col items-start gap-1">
-                  <SkillChip skill={skill} target size="md" expertise />
-                  {jobs.length > 0 && (
-                    <p class="pl-1 text-sm text-muted">
-                      Used at{' '}
-                      {jobs.map((job, i) => (
-                        <>
-                          <a
-                            href={`/work/${job.id}`}
-                            class="text-paper/80 hover:text-accent hover:underline"
-                          >
-                            {job.company}
-                          </a>
-                          {i < jobs.length - 1 ? ', ' : '.'}
-                        </>
-                      ))}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
+          <ul class="mt-4 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {category.skills.map((skill) => (
+              <li>
+                <SkillCard skill={skill} usedAt={usedAt.get(skill.slug) ?? []} />
+              </li>
+            ))}
           </ul>
         </section>
       ))}

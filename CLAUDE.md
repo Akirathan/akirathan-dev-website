@@ -72,14 +72,15 @@ src/
   gfx/               Three.js / shader code, loaded lazily on the client
 ```
 
-`/skills` lists every skill as a chip (`SkillChip.astro`) grouped by category, with the work
-entries that use it. Experience tags render as chips that link to `/skills#<slug>`; an unknown
-tag fails the build (`skillByLabel` throws). A skill gets a long-form note by adding
+`/skills` lists every skill as a card (`SkillCard.astro`) grouped by category, with the work
+entries that use it. Elsewhere a skill is a small chip (`SkillChip.astro`). Experience tags
+render as chips that link to `/skills#<slug>`; an unknown tag fails the build (`skillByLabel`
+throws). A skill gets a long-form note by adding
 `src/content/skills/<slug>.mdx`: the chip then links to `/skills/<slug>` from everywhere. A
 skill gets an icon by adding `src/assets/skills/<slug>.png` (256 px, transparent; official
 logos only). A note whose file name matches no slug fails the build. A skill gets an expertise
-meter in its chip on `/skills` by setting `expertise` (integer 1-10) in `skills.ts`; the
-segments fill with a CSS animation (scoped `<style>` in `SkillChip.astro`).
+meter in its card on `/skills` by setting `expertise` (integer 1-10) in `skills.ts`; the
+segments fill with a CSS animation (scoped `<style>` in `SkillCard.astro`).
 
 `cad/*.fs` is the source of truth for custom features in the owner's Onshape documents.
 FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP server
