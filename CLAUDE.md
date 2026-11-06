@@ -80,7 +80,8 @@ throws). A skill gets a long-form note by adding
 skill gets an icon by adding `src/assets/skills/<slug>.png` (256 px, transparent; official
 logos only). A note whose file name matches no slug fails the build. A skill gets an expertise
 meter in its card on `/skills` by setting `expertise` (integer 1-10) in `skills.ts`; the
-segments fill with a CSS animation (scoped `<style>` in `SkillCard.astro`).
+segments fill with a CSS animation when the meter comes into view (an `IntersectionObserver`
+sets `data-inview`; both live in `SkillCard.astro`).
 
 `cad/*.fs` is the source of truth for custom features in the owner's Onshape documents.
 FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP server

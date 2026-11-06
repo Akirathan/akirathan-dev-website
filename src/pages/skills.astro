@@ -25,10 +25,12 @@ const usedAt = await usedAtBySkill();
     <div class="mt-12 space-y-12">
       {skillCategories.map((category) => (
         <section>
-          <h2 class="text-center text-3xl font-semibold text-accent">{category.title}</h2>
+          <h2 class="category-title text-center text-3xl font-semibold text-accent">
+            {category.title}
+          </h2>
           <ul class="mt-6 grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {category.skills.map((skill) => (
-              <li>
+              <li class="skill-item">
                 <SkillCard skill={skill} usedAt={usedAt.get(skill.slug) ?? []} />
               </li>
             ))}
@@ -38,3 +40,67 @@ const usedAt = await usedAtBySkill();
     </div>
   </section>
 </BaseLayout>
+
+<style>
+  /* The line under a category title grows from the centre as the title scrolls into view. */
+  .category-title::after {
+    content: '';
+    display: block;
+    width: 6rem;
+    height: 2px;
+    margin: 0.75rem auto 0;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  }
+
+  /* Cards rise into place row by row; `--col` delays each column a little. */
+  .skill-item {
+    --col: 0;
+  }
+
+  @media (min-width: 40rem) and (max-width: 63.99rem) {
+    .skill-item:nth-child(2n + 2) {
+      --col: 1;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .skill-item:nth-child(3n + 2) {
+      --col: 1;
+    }
+
+    .skill-item:nth-child(3n + 3) {
+      --col: 2;
+    }
+  }
+
+  @keyframes line-grow {
+    from {
+      scale: 0 1;
+      opacity: 0;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 2rem;
+    }
+  }
+
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .category-title::after {
+        animation: line-grow linear both;
+        animation-timeline: view();
+        animation-range: entry 100% cover 35%;
+      }
+
+      .skill-item {
+        animation: rise linear both;
+        animation-timeline: view();
+        animation-range: entry calc(var(--col) * 12%) entry calc(60% + var(--col) * 12%);
+      }
+    }
+  }
+</style>
