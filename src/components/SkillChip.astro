@@ -11,7 +11,7 @@ import { hasArticle } from '../data/skillContent';
  * link target and highlights when addressed by the URL fragment.
  *
  * With `expertise`, a skill that has an expertise value shows it as a meter of 10 segments
- * under the label (CSS fill animation: `.meter-on` in global.css).
+ * under the label. The lit segments fill one after another (CSS only, `--i` = segment index).
  */
 interface Props {
   skill: Skill;
@@ -80,3 +80,23 @@ const tone = article
     </span>
   )}
 </Tag>
+
+<style>
+  @keyframes meter-fill {
+    from {
+      background-color: color-mix(in oklch, var(--color-paper) 12%, transparent);
+      scale: 1 0.4;
+    }
+  }
+
+  .meter-on {
+    background-color: var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .meter-on {
+      animation: meter-fill 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+      animation-delay: calc(250ms + var(--i) * 70ms);
+    }
+  }
+</style>

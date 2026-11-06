@@ -61,20 +61,3 @@
     }
   }
 }
-
-/* Expertise meter in a skill chip: the lit segments fill one after another (`--i` = index). */
-@keyframes meter-fill {
-  from {
-    background-color: color-mix(in oklch, var(--color-paper) 12%, transparent);
-    scale: 1 0.4;
-  }
-}
-
-.meter-on {
-  background-color: var(--color-accent);
-
-  @media (prefers-reduced-motion: no-preference) {
-    animation: meter-fill 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
-    animation-delay: calc(250ms + var(--i) * 70ms);
-  }
-}

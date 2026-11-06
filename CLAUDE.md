@@ -79,7 +79,7 @@ tag fails the build (`skillByLabel` throws). A skill gets a long-form note by ad
 skill gets an icon by adding `src/assets/skills/<slug>.png` (256 px, transparent; official
 logos only). A note whose file name matches no slug fails the build. A skill gets an expertise
 meter in its chip on `/skills` by setting `expertise` (integer 1-10) in `skills.ts`; the
-segments fill with a CSS animation (`.meter-on` in `global.css`).
+segments fill with a CSS animation (scoped `<style>` in `SkillChip.astro`).
 
 `cad/*.fs` is the source of truth for custom features in the owner's Onshape documents.
 FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP server
