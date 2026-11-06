@@ -12,8 +12,10 @@ export interface Skill {
    * `src/content/skills/`, and of an optional icon in `src/assets/skills/`.
    */
   slug: string;
-  /** One short line, optional. */
+  /** One short line, optional. Shown as the tagline of the long-form note. */
   note?: string;
+  /** Self-assessed expertise, an integer from 1 to 10. Shown as a meter in the chip on /skills. */
+  expertise?: number;
 }
 
 export interface SkillCategory {
@@ -23,17 +25,17 @@ export interface SkillCategory {
 
 export const skillCategories: SkillCategory[] = [
   {
-    title: 'Languages',
+    title: 'Programming languages',
     skills: [
-      { label: 'Java', slug: 'java', note: 'The language I am fastest in.' },
-      { label: 'Scala', slug: 'scala' },
-      { label: 'R', slug: 'r', note: 'Implemented it, not only used it.' },
-      { label: 'Python', slug: 'python' },
+      { label: 'Java', slug: 'java', note: 'The language I am fastest in.', expertise: 9 },
+      { label: 'Scala', slug: 'scala', expertise: 7 },
+      { label: 'R', slug: 'r', note: 'Implemented it, not only used it.', expertise: 8 },
+      { label: 'Python', slug: 'python', expertise: 7 },
       { label: 'C', slug: 'c' },
-      { label: 'C++', slug: 'cpp' },
-      { label: 'Rust', slug: 'rust' },
-      { label: 'TypeScript', slug: 'typescript' },
-      { label: 'Liquid', slug: 'liquid' },
+      { label: 'C++', slug: 'cpp', expertise: 5 },
+      { label: 'Rust', slug: 'rust', expertise: 7 },
+      { label: 'TypeScript', slug: 'typescript', expertise: 7 },
+      { label: 'Liquid', slug: 'liquid', expertise: 8 },
     ],
   },
   {
@@ -84,6 +86,17 @@ export const skillCategories: SkillCategory[] = [
 
 export const skills: Skill[] = skillCategories.flatMap((c) => c.skills);
 
+for (const s of skills) {
+  if (
+    s.expertise !== undefined &&
+    !(Number.isInteger(s.expertise) && s.expertise >= 1 && s.expertise <= 10)
+  ) {
+    throw new Error(
+      `Skill "${s.label}": expertise must be an integer from 1 to 10, got ${s.expertise}.`,
+    );
+  }
+}
+
 const byLabel = new Map(skills.map((s) => [s.label, s]));
 
 /** Finds a skill by its exact label. Throws, so that a typo in a tag fails the build. */
@@ -97,6 +110,9 @@ export function skillByLabel(label: string): Skill {
 
 /** The chip's place on the keywords page. */
 export const skillHref = (skill: Skill) => `/skills#${skill.slug}`;
+
+/** `view-transition-name` prefix shared by the card on /skills and the note page. */
+export const skillTransitionName = (skill: Skill) => `skill-${skill.slug}`;
 
 /** The long-form note, if `src/content/skills/<slug>.mdx` exists. */
 export const skillArticleHref = (skill: Skill) => `/skills/${skill.slug}`;

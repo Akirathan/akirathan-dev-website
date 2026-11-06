@@ -1,0 +1,172 @@
+---
+import { Image } from 'astro:assets';
+import { skillArticleHref, skillIcon, skillTransitionName, type Skill } from '../data/skills';
+import { hasArticle, type UsedAt } from '../data/skillContent';
+
+/**
+ * A skill on /skills: icon, title, expertise meter, and the work entries that use it. The card
+ * is the target of `/skills#<slug>` and highlights when the URL addresses it.
+ */
+interface Props {
+  skill: Skill;
+  usedAt: UsedAt[];
+}
+
+const { skill, usedAt } = Astro.props;
+const article = await hasArticle(skill);
+const icon = skillIcon(skill);
+const level = skill.expertise;
+// Only a card with a note links to a page that has the matching names.
+const morph = (part: string) =>
+  article ? `view-transition-name: ${skillTransitionName(skill)}-${part}` : undefined;
+---
+
+<div
+  id={skill.slug}
+  class:list={[
+    'relative flex h-full min-h-36 scroll-mt-28 flex-col gap-3 rounded-2xl border border-paper/15 bg-ink-soft/90 px-5 py-4 transition-colors',
+    'target:border-accent target:bg-linear-to-b target:from-accent/15 target:to-accent/15',
+    article ? 'with-article' : '',
+  ]}
+>
+  <h3 class="flex min-h-8 items-center gap-3 text-xl font-semibold text-paper">
+    {icon && (
+      <Image
+        src={icon}
+        alt=""
+        width={64}
+        height={64}
+        class="size-8 shrink-0"
+        style={morph('icon')}
+      />
+    )}
+    {article ? (
+      // The ::after box stretches the link over the whole card.
+      <a href={skillArticleHref(skill)} class="after:absolute after:inset-0 after:rounded-2xl">
+        <span style={morph('title')}>{skill.label}</span>
+        <span aria-hidden="true" class="ml-1 text-accent">
+          →
+        </span>
+      </a>
+    ) : (
+      skill.label
+    )}
+  </h3>
+
+  {level !== undefined && (
+    <div class="flex items-center gap-3 text-xs text-muted">
+      <span>Expertise</span>
+      <span aria-hidden="true" class="flex gap-0.5">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span
+            class:list={['h-2 w-2.5 rounded-[2px]', i < level ? 'meter-on' : 'bg-paper/12']}
+            style={`--i: ${i}`}
+          />
+        ))}
+      </span>
+      <span class="tabular-nums">{level}/10</span>
+    </div>
+  )}
+
+  {usedAt.length > 0 && (
+    <p class="mt-auto text-sm text-muted">
+      Used at{' '}
+      {usedAt.map((job, i) => (
+        <>
+          <a
+            href={`/work/${job.id}`}
+            class="relative z-10 text-paper/80 hover:text-accent hover:underline"
+          >
+            {job.company}
+          </a>
+          {i < usedAt.length - 1 ? ', ' : '.'}
+        </>
+      ))}
+    </p>
+  )}
+</div>
+
+<style>
+  @keyframes meter-fill {
+    from {
+      background-color: color-mix(in oklch, var(--color-paper) 12%, transparent);
+      scale: 1 0.4;
+    }
+  }
+
+  .meter-on {
+    background-color: var(--color-accent);
+  }
+
+  /* Waits until /skills marks the card's list item with `data-inview`. Without scripting, the
+     meter shows full. */
+  @media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+    .meter-on {
+      animation: meter-fill 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both paused;
+      animation-delay: calc(350ms + var(--col, 0) * 90ms + var(--i) * 70ms);
+    }
+
+    :global([data-inview]) .meter-on {
+      animation-play-state: running;
+    }
+  }
+
+  .with-article:hover {
+    transition-property: color, background-color, border-color;
+    transition-duration: 300ms;
+    box-shadow: 0 20px 60px -30px var(--color-accent);
+    border-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+  }
+
+  /* A signal runs once around the border, like a pulse on a circuit trace. */
+  @property --trace-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  @keyframes trace {
+    0% {
+      --trace-angle: 0deg;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      --trace-angle: 360deg;
+      opacity: 0;
+    }
+  }
+
+  .with-article::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    padding: 2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: conic-gradient(
+      from var(--trace-angle),
+      transparent 0deg 230deg,
+      color-mix(in oklch, var(--color-accent) 50%, transparent) 320deg,
+      var(--color-accent) 350deg,
+      white 360deg
+    );
+    /* Keep only the border ring: the content box is cut out of the full box. */
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .with-article:hover::before,
+    .with-article:focus-within::before {
+      animation: trace 1.4s cubic-bezier(0.45, 0, 0.3, 1);
+    }
+  }
+</style>
