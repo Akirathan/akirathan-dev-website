@@ -1,6 +1,6 @@
 ---
 import { Image } from 'astro:assets';
-import { skillArticleHref, skillIcon, type Skill } from '../data/skills';
+import { skillArticleHref, skillIcon, skillTransitionName, type Skill } from '../data/skills';
 import { hasArticle, type UsedAt } from '../data/skillContent';
 
 /**
@@ -16,6 +16,9 @@ const { skill, usedAt } = Astro.props;
 const article = await hasArticle(skill);
 const icon = skillIcon(skill);
 const level = skill.expertise;
+// Only a card with a note links to a page that has the matching names.
+const morph = (part: string) =>
+  article ? `view-transition-name: ${skillTransitionName(skill)}-${part}` : undefined;
 ---
 
 <div
@@ -27,11 +30,20 @@ const level = skill.expertise;
   ]}
 >
   <h3 class="flex min-h-8 items-center gap-3 text-xl font-semibold text-paper">
-    {icon && <Image src={icon} alt="" width={64} height={64} class="size-8 shrink-0" />}
+    {icon && (
+      <Image
+        src={icon}
+        alt=""
+        width={64}
+        height={64}
+        class="size-8 shrink-0"
+        style={morph('icon')}
+      />
+    )}
     {article ? (
       // The ::after box stretches the link over the whole card.
       <a href={skillArticleHref(skill)} class="after:absolute after:inset-0 after:rounded-2xl">
-        {skill.label}
+        <span style={morph('title')}>{skill.label}</span>
         <span aria-hidden="true" class="ml-1 text-accent">
           →
         </span>
@@ -98,5 +110,57 @@ const level = skill.expertise;
     transition-duration: 300ms;
     box-shadow: 0 20px 60px -30px var(--color-accent);
     border-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+  }
+
+  /* A signal runs once around the border, like a pulse on a circuit trace. */
+  @property --trace-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  @keyframes trace {
+    0% {
+      --trace-angle: 0deg;
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      --trace-angle: 360deg;
+      opacity: 0;
+    }
+  }
+
+  .with-article::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    padding: 2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: conic-gradient(
+      from var(--trace-angle),
+      transparent 0deg 230deg,
+      color-mix(in oklch, var(--color-accent) 50%, transparent) 320deg,
+      var(--color-accent) 350deg,
+      white 360deg
+    );
+    /* Keep only the border ring: the content box is cut out of the full box. */
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .with-article:hover::before,
+    .with-article:focus-within::before {
+      animation: trace 1.4s cubic-bezier(0.45, 0, 0.3, 1);
+    }
   }
 </style>

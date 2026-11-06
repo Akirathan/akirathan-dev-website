@@ -111,6 +111,9 @@ export function skillByLabel(label: string): Skill {
 /** The chip's place on the keywords page. */
 export const skillHref = (skill: Skill) => `/skills#${skill.slug}`;
 
+/** `view-transition-name` prefix shared by the card on /skills and the note page. */
+export const skillTransitionName = (skill: Skill) => `skill-${skill.slug}`;
+
 /** The long-form note, if `src/content/skills/<slug>.mdx` exists. */
 export const skillArticleHref = (skill: Skill) => `/skills/${skill.slug}`;
 

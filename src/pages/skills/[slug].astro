@@ -1,7 +1,13 @@
 ---
 import { getCollection, render } from 'astro:content';
 import ArticleLayout from '../../layouts/ArticleLayout.astro';
-import { skillCategoryOf, skillHref, skillIcon, skills } from '../../data/skills';
+import {
+  skillCategoryOf,
+  skillHref,
+  skillIcon,
+  skills,
+  skillTransitionName,
+} from '../../data/skills';
 import { usedAtBySkill } from '../../data/skillContent';
 
 export async function getStaticPaths() {
@@ -31,6 +37,7 @@ const jobs = (await usedAtBySkill()).get(skill.slug) ?? [];
   icon={skillIcon(skill)}
   backHref={skillHref(skill)}
   backLabel="All skills"
+  transitionName={skillTransitionName(skill)}
 >
   <Fragment slot="header">
     {jobs.length > 0 && (
