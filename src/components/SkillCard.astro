@@ -56,7 +56,7 @@ const morph = (part: string) =>
   {level !== undefined && (
     <div class="flex items-center gap-3 text-xs text-muted">
       <span>Expertise</span>
-      <span aria-hidden="true" class="flex gap-0.5" data-meter>
+      <span aria-hidden="true" class="flex gap-0.5">
         {Array.from({ length: 10 }, (_, i) => (
           <span
             class:list={['h-2 w-2.5 rounded-[2px]', i < level ? 'meter-on' : 'bg-paper/12']}
@@ -86,36 +86,6 @@ const morph = (part: string) =>
   )}
 </div>
 
-<script>
-  let observer: IntersectionObserver | undefined;
-
-  document.addEventListener('astro:page-load', () => {
-    const meters = document.querySelectorAll('[data-meter]');
-    if (meters.length === 0) {
-      return;
-    }
-    observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.setAttribute('data-inview', '');
-            observer?.unobserve(entry.target);
-          }
-        }
-      },
-      { rootMargin: '0px 0px -10% 0px' },
-    );
-    for (const meter of meters) {
-      observer.observe(meter);
-    }
-  });
-
-  document.addEventListener('astro:before-swap', () => {
-    observer?.disconnect();
-    observer = undefined;
-  });
-</script>
-
 <style>
   @keyframes meter-fill {
     from {
@@ -128,14 +98,15 @@ const morph = (part: string) =>
     background-color: var(--color-accent);
   }
 
-  /* Waits for `data-inview` (set by the script below). Without scripting, the meter shows full. */
+  /* Waits until /skills marks the card's list item with `data-inview`. Without scripting, the
+     meter shows full. */
   @media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
     .meter-on {
       animation: meter-fill 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both paused;
-      animation-delay: calc(150ms + var(--i) * 70ms);
+      animation-delay: calc(350ms + var(--col, 0) * 90ms + var(--i) * 70ms);
     }
 
-    [data-inview] .meter-on {
+    :global([data-inview]) .meter-on {
       animation-play-state: running;
     }
   }
