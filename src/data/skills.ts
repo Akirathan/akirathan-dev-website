@@ -25,7 +25,7 @@ export interface SkillCategory {
 
 export const skillCategories: SkillCategory[] = [
   {
-    title: 'Languages',
+    title: 'Programming languages',
     skills: [
       { label: 'Java', slug: 'java', note: 'The language I am fastest in.', expertise: 9 },
       { label: 'Scala', slug: 'scala', expertise: 7 },
