@@ -23,3 +23,20 @@ fits the problem and switch when it makes sense.
 ## Open source
 
 I contribute to open source whenever I can. All of my work at Enso is public.
+
+## Simplicity
+
+### Simple architecture
+
+- Don't include unnecessary dependencies.
+- If something can be easily done by the standard library, do it via the standard library.
+
+I have seen bringing [AKKA Http library](???) for one HTTP request.
+Which means that in order to make that request, the JVM needs to load cca 2000 classes.
+I removed that dependency, made the request via standard library, and cut down the number of loaded classes to cca 10.
+
+### Simple code
+
+Simple code is easy to read, and therefore, fast to read.
+And that is what we should strive to optimize.
+
