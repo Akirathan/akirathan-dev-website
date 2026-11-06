@@ -25,22 +25,36 @@ const article = await hasArticle(skill);
 const icon = skillIcon(skill);
 const level = showExpertise ? skill.expertise : undefined;
 
-const href = article ? skillArticleHref(skill) : target ? undefined : skillHref(skill);
+type Kind = 'article' | 'target' | 'link';
+let kind: Kind = 'link';
+if (article) {
+  kind = 'article';
+} else if (target) {
+  kind = 'target';
+}
+
+const hrefs: Record<Kind, string | undefined> = {
+  article: skillArticleHref(skill),
+  target: undefined,
+  link: skillHref(skill),
+};
+const tones: Record<Kind, string> = {
+  article: 'border-paper/25 text-paper/90 hover:border-accent hover:bg-accent/10 hover:text-paper',
+  target: 'border-paper/15 text-paper/85',
+  link: 'border-paper/15 text-muted hover:border-accent/60 hover:text-paper',
+};
+const href = hrefs[kind];
+const tone = tones[kind];
 const Tag = href ? 'a' : 'span';
 
-const shape =
-  level !== undefined
-    ? 'inline-flex flex-col items-start gap-2 rounded-xl px-4 py-2.5 text-sm'
-    : size === 'md'
-      ? 'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm'
-      : 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs';
+const pills = {
+  sm: 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs',
+  md: 'inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm',
+};
+const card = 'inline-flex flex-col items-start gap-2 rounded-xl px-4 py-2.5 text-sm';
+const shape = level !== undefined ? card : pills[size];
 const iconClass = size === 'md' ? '-ml-1.5 size-5' : '-ml-1 size-4';
 const highlight = 'target:border-accent target:bg-accent/15 target:text-paper';
-const tone = article
-  ? 'border-paper/25 text-paper/90 hover:border-accent hover:bg-accent/10 hover:text-paper'
-  : target
-    ? 'border-paper/15 text-paper/85'
-    : 'border-paper/15 text-muted hover:border-accent/60 hover:text-paper';
 ---
 
 <Tag
