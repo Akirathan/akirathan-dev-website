@@ -15,6 +15,9 @@ const experience = (await getCollection('experience')).sort(byOrder);
 const mainJobs = experience.filter((e) => !e.data.minor);
 const minorJobs = experience.filter((e) => e.data.minor);
 const topics = (await getCollection('topics')).sort(byOrder);
+// The About board: the first half of the topics left of the CPU, the rest right, in order.
+const aboutLeft = topics.slice(0, Math.ceil(topics.length / 2));
+const aboutRight = topics.slice(aboutLeft.length);
 ---
 
 <BaseLayout animatedBackground>
@@ -126,16 +129,42 @@ const topics = (await getCollection('topics')).sort(byOrder);
   </section>
 
   <!-- About -->
+  <!-- About: the heading is printed on the CPU lid; the topics hang on wires at both sides. -->
   <section id="about" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
-    <h2 class="reveal text-3xl font-bold tracking-tight sm:text-4xl">About me</h2>
-    <div class="mt-8 grid gap-5 sm:grid-cols-2">
-      {topics.map((topic) => (
-        <Card
-          href={`/${topic.id}`}
-          title={topic.data.title}
-          meta={topic.data.tagline}
-          bullets={topic.data.summary}
-        />
+    <div
+      {...attr(hooks.wiredBoard)}
+      {...attr(hooks.wiresFrom, '(min-width: 64rem)')}
+      class="group relative grid gap-5 sm:grid-cols-2 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-x-12 xl:gap-x-16"
+    >
+      <svg
+        {...attr(hooks.boardWires)}
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible opacity-0 transition-opacity duration-1000 group-data-wired:opacity-100 lg:block"
+      ></svg>
+      <div class="relative mx-auto mb-1 aspect-square w-44 sm:col-span-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:mb-0 lg:w-60 xl:w-64">
+        <h2 class="absolute inset-0 grid place-items-center text-3xl font-bold tracking-tight transition-opacity duration-1000 group-has-[[data-ready]]:opacity-0 sm:text-4xl">
+          About me
+        </h2>
+        <CpuScene text={['About me']} class="h-full w-full" />
+      </div>
+      {[aboutLeft, aboutRight].map((column, c) => (
+        <div
+          class:list={[
+            'grid gap-5',
+            c === 0 ? 'lg:col-start-1' : 'lg:col-start-3',
+            'lg:row-start-1',
+          ]}
+        >
+          {column.map((topic) => (
+            <Card
+              wireSide={c === 0 ? 'left' : 'right'}
+              href={`/${topic.id}`}
+              title={topic.data.title}
+              meta={topic.data.tagline}
+              bullets={topic.data.summary}
+            />
+          ))}
+        </div>
       ))}
     </div>
   </section>
@@ -145,17 +174,15 @@ const topics = (await getCollection('topics')).sort(byOrder);
   import { hooks, selector } from '../dom';
   import { startWiredBoard } from '../gfx/wiredBoard';
 
-  let dispose: (() => void) | null = null;
+  let disposers: (() => void)[] = [];
 
   document.addEventListener('astro:page-load', () => {
-    const board = document.querySelector<HTMLElement>(selector(hooks.wiredBoard));
-    if (board) {
-      dispose = startWiredBoard(board);
-    }
+    const boards = document.querySelectorAll<HTMLElement>(selector(hooks.wiredBoard));
+    disposers = [...boards].map((board) => startWiredBoard(board));
   });
 
   document.addEventListener('astro:before-swap', () => {
-    dispose?.();
-    dispose = null;
+    disposers.forEach((dispose) => dispose());
+    disposers = [];
   });
 </script>
