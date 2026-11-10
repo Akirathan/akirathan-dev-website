@@ -3,6 +3,7 @@ const links = [
   { href: '/#work', label: 'Work' },
   { href: '/#about', label: 'About' },
   { href: '/skills', label: 'Skills' },
+  { href: '/contact', label: 'Contact' },
   { href: 'https://github.com/Akirathan', label: 'GitHub', external: true },
   { href: 'https://www.linkedin.com/in/pavel-marek-56a517140/', label: 'LinkedIn', external: true },
 ];
@@ -13,9 +14,9 @@ const links = [
     akirathan<span class="text-accent">.dev</span>
   </a>
   <nav aria-label="Main">
-    <ul class="flex items-center gap-5 text-sm text-muted">
+    <ul class="flex items-center gap-4 text-sm text-muted sm:gap-5">
       {links.map((l) => (
-        <li>
+        <li class:list={[l.external && 'hidden sm:list-item']}>
           <a
             href={l.href}
             class="transition-colors hover:text-paper"

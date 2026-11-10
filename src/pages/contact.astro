@@ -1,0 +1,31 @@
+---
+import { Image } from 'astro:assets';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ContactBoard from '../components/ContactBoard.astro';
+import portrait from '../assets/portrait.jpg';
+---
+
+<BaseLayout
+  title="Contact · Pavel Marek"
+  description="E-mail, GitHub, and LinkedIn of Pavel Marek."
+>
+  <section class="mx-auto w-full max-w-6xl px-4 py-12 sm:px-6 lg:py-16">
+    <div class="flex flex-col items-center gap-4 text-center sm:flex-row sm:gap-8 sm:text-left">
+      <!-- The studio black of the photo melts into the page; the mask hides its edges. -->
+      <Image
+        src={portrait}
+        alt="Pavel Marek"
+        widths={[160, 240, 320, 480]}
+        sizes="(min-width: 640px) 10rem, 8rem"
+        class="w-32 [mask-image:radial-gradient(ellipse_60%_55%_at_50%_42%,black_55%,transparent_100%)] sm:w-40"
+        loading="eager"
+      />
+      <div>
+        <p class="text-sm font-medium tracking-widest text-accent uppercase">Pavel Marek · Brno</p>
+        <h1 class="mt-2 text-5xl font-bold tracking-tight sm:text-6xl">Contact</h1>
+      </div>
+    </div>
+
+    <ContactBoard class="mt-12 lg:mt-8" />
+  </section>
+</BaseLayout>

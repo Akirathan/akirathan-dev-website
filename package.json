@@ -21,6 +21,7 @@
     "@astrojs/sitemap": "^3.7.4",
     "@fontsource-variable/baloo-2": "^5.3.0",
     "@fontsource-variable/montserrat": "^5.3.0",
+    "@tabler/icons": "^3.51.0",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.4.4",
     "github-slugger": "^2.0.0",

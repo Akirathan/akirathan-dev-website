@@ -48,9 +48,16 @@ import modelInfo from '../data/cpu-model.json';
 // Public API
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * `showcase`: three-quarter view, slow turn, assembles when it scrolls into view.
+ * `top`: seen from straight above, no turn, already assembled.
+ */
+export type CpuView = 'showcase' | 'top';
+
 export interface CpuOptions {
   /** Freeze all motion and render one assembled frame only. */
   reducedMotion: boolean;
+  view?: CpuView;
   /** Glow colour of the signal pulses, hex. */
   accent: string;
   /** CSS font-family for the etched text. */
@@ -69,9 +76,33 @@ export interface TraceEnd {
   outward: THREE.Vector3;
 }
 
+/** A trace end as it appears on the canvas in the current frame. */
+export interface ScreenTraceEnd {
+  end: TraceEnd;
+  /** CSS pixels from the top-left corner of the canvas. */
+  x: number;
+  y: number;
+  /** `outward` on the screen, unit length. */
+  dx: number;
+  dy: number;
+}
+
+/** Gets one array that is reused for every call: copy what must outlive the call. */
+export type FrameListener = (ends: ScreenTraceEnd[]) => void;
+
+/** How far to lean on each screen axis, -1..1 (Y down); 1 is the full `TOP_LEAN`. */
+export interface LeanTarget {
+  x: number;
+  y: number;
+}
+
 export interface CpuHandle {
   /** The 56 trace ends, for paths that continue outside the chip. */
   traceEnds: TraceEnd[];
+  /** Calls `listener` after each rendered frame and after a resize. Returns the unsubscribe. */
+  onFrameChange(listener: FrameListener): () => void;
+  /** Top view: tilts the chip toward a direction on the screen; `null` returns it to rest. */
+  lean(toward: LeanTarget | null): void;
   dispose(): void;
 }
 
@@ -109,6 +140,18 @@ const PIN_DROP = 1.6;
 const LID_DROP = 1.3;
 /** Yaw at the start, so that the lid print reads left to right from the camera. */
 const REST_YAW = 0.6 - Math.PI / 2;
+/** Yaw for the top view, so that the lid print reads upright. */
+const TOP_YAW = 0;
+/** Camera height of the top view for a square canvas; the package fills about 70 % of it. */
+const TOP_DISTANCE = 5.4;
+/** Largest pointer tilt of the top view, radians (about 6°). */
+const TOP_TILT = 0.1;
+/** Largest tilt of the top view toward the active contact card, per axis, radians (about 10°). */
+const TOP_LEAN = 0.17;
+/** The top view is close to the lid, so its lights are dimmer than in the showcase. */
+const TOP_LIGHT = { key: 1.4, glint: 2.5, environment: 0.3 };
+/** The moving light of the top view: height above the lid, and its reach to the sides. */
+const GLINT = { height: 1.6, drift: 1.1, follow: 1.8 };
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/cpu.glb`;
 /** Size of one repeat of the weave tile on the substrate, metres (8 cells of 0.4 mm). */
@@ -135,8 +178,8 @@ interface Timeline {
   seconds: THREE.Node<'float'>;
 }
 
-function createTimeline(reducedMotion: boolean): Timeline {
-  const assemble = floatUniform(reducedMotion ? 1 : 0);
+function createTimeline(reducedMotion: boolean, assembles: boolean): Timeline {
+  const assemble = floatUniform(assembles ? 0 : 1);
   const motion = floatUniform(reducedMotion ? 0 : 1);
   return { assemble, motion, seconds: time.mul(motion) };
 }
@@ -164,16 +207,27 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<THREE.WebGPURe
   return renderer;
 }
 
-/** A three-quarter view from above, as in a product photo. */
-function createCamera(): THREE.PerspectiveCamera {
+function createCamera(view: CpuView): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  camera.position.set(2.5, 2.0, 3.1);
+  if (view === 'top') {
+    // Up must be set before lookAt; the camera looks along it otherwise.
+    camera.up.set(0, 0, -1);
+    camera.position.set(0, TOP_DISTANCE, 0);
+  } else {
+    // A three-quarter view from above, as in a product photo.
+    camera.position.set(2.5, 2.0, 3.1);
+  }
   camera.lookAt(0, -0.05, 0);
   return camera;
 }
 
+/** Keeps the whole package in a top view on a canvas that is taller than wide. */
+function fitTopCamera(camera: THREE.PerspectiveCamera): void {
+  camera.position.y = TOP_DISTANCE * Math.max(1, 1 / camera.aspect);
+}
+
 /** A warm key light, a cool rim light, and the accent colour glowing up from under the pins. */
-function addLights(scene: THREE.Scene, accent: THREE.Color): void {
+function addLights(scene: THREE.Scene, accent: THREE.Color): THREE.DirectionalLight {
   scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x0b0e14, 0.5));
 
   const key = new THREE.DirectionalLight(0xfff4e6, 2.4);
@@ -187,6 +241,15 @@ function addLights(scene: THREE.Scene, accent: THREE.Color): void {
   const under = new THREE.PointLight(accent, 6, 4, 2);
   under.position.set(0, -0.9, 0);
   scene.add(under);
+  return key;
+}
+
+/** A warm point light close above the chip. Its highlight moves across the brushed lid. */
+function addGlint(scene: THREE.Scene): THREE.PointLight {
+  const glint = new THREE.PointLight(0xfff4e6, TOP_LIGHT.glint, 8, 2);
+  glint.position.set(0, GLINT.height, 0);
+  scene.add(glint);
+  return glint;
 }
 
 /** Soft studio reflections for the metal. Returns a dispose function. */
@@ -453,6 +516,7 @@ function dressModel(
 
 /** Trace ends from the build step, converted to the chip's frame. */
 function traceEndsOf(model: THREE.Group): TraceEnd[] {
+  model.updateMatrix();
   return modelInfo.traceEnds.map(({ side, index, position: [x, y, z] }) => {
     const position = new THREE.Vector3(x, y, z).applyMatrix4(model.matrix);
     const outward = new THREE.Vector3(
@@ -577,6 +641,11 @@ interface Rig {
   lid: THREE.Mesh;
   shadow: THREE.Mesh;
   timeline: Timeline;
+  key: THREE.DirectionalLight;
+  /** Top view only. */
+  glint: THREE.PointLight | null;
+  /** Top view: the smoothed lean, as a unit-or-shorter screen direction. */
+  lean: THREE.Vector2;
 }
 
 /** Reads the pointer in clip space (-1..1) and smooths it, so the tilt lags a little. */
@@ -598,17 +667,87 @@ function createPointer() {
 }
 
 /** Sets the pose for one moment in time. `assembled` is 0..1; `seconds` is the clock. */
-function pose(rig: Rig, pointer: THREE.Vector2, assembled: number, seconds: number): void {
+function pose(
+  rig: Rig,
+  view: CpuView,
+  pointer: THREE.Vector2,
+  assembled: number,
+  seconds: number,
+): void {
   rig.timeline.assemble.value = assembled;
 
   // The lid starts to settle when the pins are mostly in place.
   const lidProgress = Math.max(0, (assembled - 0.4) / 0.6);
   rig.lid.position.z = ((1 - easeOutCubic(lidProgress)) * LID_DROP) / MODEL_SCALE;
 
+  if (view === 'top') {
+    // The edge toward the pointer or the active card dips, as if the chip faces it.
+    rig.chip.rotation.set(
+      -pointer.y * TOP_TILT + rig.lean.y * TOP_LEAN,
+      TOP_YAW,
+      -pointer.x * TOP_TILT - rig.lean.x * TOP_LEAN,
+      'XZY',
+    );
+    // The light follows the pointer and drifts on its own, so the lid never looks printed.
+    const driftX = Math.sin(seconds * 0.31) * GLINT.drift;
+    const driftZ = Math.cos(seconds * 0.23) * GLINT.drift;
+    const x = driftX + pointer.x * GLINT.follow;
+    const z = driftZ - pointer.y * GLINT.follow;
+    rig.glint?.position.set(x, GLINT.height, z);
+    rig.key.position.set(x * 2, 5, z * 2);
+    return;
+  }
   rig.chip.rotation.y = REST_YAW + seconds * 0.16 + pointer.x * 0.35;
   rig.chip.rotation.x = -pointer.y * 0.18;
   rig.chip.position.y = Math.sin(seconds * 0.7) * 0.03;
   rig.shadow.scale.setScalar(1 - rig.chip.position.y * 0.6);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Trace ends on the screen, for DOM or SVG paths that continue outside the canvas
+// ---------------------------------------------------------------------------------------------
+
+function createProjector(traceEnds: TraceEnd[]) {
+  const screen: ScreenTraceEnd[] = traceEnds.map((end) => ({ end, x: 0, y: 0, dx: 0, dy: 0 }));
+  const base = new THREE.Vector3();
+  const tip = new THREE.Vector3();
+  const listeners = new Set<FrameListener>();
+
+  const notify = (chip: THREE.Object3D, camera: THREE.Camera, canvas: HTMLCanvasElement) => {
+    if (listeners.size === 0) {
+      return;
+    }
+    const { clientWidth: w, clientHeight: h } = canvas;
+    chip.updateMatrixWorld();
+    for (const item of screen) {
+      base.copy(item.end.position).applyMatrix4(chip.matrixWorld).project(camera);
+      tip
+        .copy(item.end.position)
+        .add(item.end.outward)
+        .applyMatrix4(chip.matrixWorld)
+        .project(camera);
+      item.x = ((base.x + 1) / 2) * w;
+      item.y = ((1 - base.y) / 2) * h;
+      // Clip space Y points up, the screen Y points down.
+      const dx = (tip.x - base.x) * w;
+      const dy = (base.y - tip.y) * h;
+      const len = Math.hypot(dx, dy) || 1;
+      item.dx = dx / len;
+      item.dy = dy / len;
+    }
+    for (const listener of listeners) {
+      listener(screen);
+    }
+  };
+
+  const subscribe = (listener: FrameListener) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+
+  return { notify, subscribe, clear: () => listeners.clear() };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -617,13 +756,20 @@ function pose(rig: Rig, pointer: THREE.Vector2, assembled: number, seconds: numb
 
 export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): Promise<CpuHandle> {
   const accent = new THREE.Color(options.accent);
-  const timeline = createTimeline(options.reducedMotion);
+  const view = options.view ?? 'showcase';
+  const assembles = !options.reducedMotion && view === 'showcase';
+  const timeline = createTimeline(options.reducedMotion, assembles);
 
   const [renderer, model] = await Promise.all([createRenderer(canvas), loadModel()]);
-  const camera = createCamera();
+  const camera = createCamera(view);
   const scene = new THREE.Scene();
-  addLights(scene, accent);
+  const key = addLights(scene, accent);
+  const glint = view === 'top' ? addGlint(scene) : null;
   const disposeEnvironment = addEnvironment(scene, renderer);
+  if (view === 'top') {
+    key.intensity = TOP_LIGHT.key;
+    scene.environmentIntensity = TOP_LIGHT.environment;
+  }
 
   // Build the chip: the CAD body plus the instanced pins.
   const dressed = dressModel(model, timeline, accent, options);
@@ -633,8 +779,20 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   chip.add(model, pins.object);
   scene.add(chip, shadow.object);
 
-  const rig: Rig = { chip, lid: dressed.lid, shadow: shadow.mesh, timeline };
+  const rig: Rig = {
+    chip,
+    lid: dressed.lid,
+    shadow: shadow.mesh,
+    timeline,
+    key,
+    glint,
+    lean: new THREE.Vector2(),
+  };
+  const leanTarget = new THREE.Vector2();
   const pointer = createPointer();
+  const traceEnds = traceEndsOf(model);
+  const projector = createProjector(traceEnds);
+  const notify = () => projector.notify(chip, camera, canvas);
 
   // Sizing.
   const resize = () => {
@@ -642,7 +800,11 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    if (view === 'top') {
+      fitTopCamera(camera);
+    }
     camera.updateProjectionMatrix();
+    notify();
   };
   window.addEventListener('resize', resize);
   resize();
@@ -652,10 +814,12 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   let assembleStart: number | null = null;
   const frame = (now: number) => {
     assembleStart ??= now;
-    const assembled = Math.min((now - assembleStart) / ASSEMBLE_MS, 1);
+    const assembled = assembles ? Math.min((now - assembleStart) / ASSEMBLE_MS, 1) : 1;
     pointer.update();
-    pose(rig, pointer.smoothed, assembled, now / 1000);
+    rig.lean.lerp(leanTarget, 0.06);
+    pose(rig, view, pointer.smoothed, assembled, now / 1000);
     renderer.render(scene, camera);
+    notify();
   };
 
   let running = false;
@@ -678,14 +842,29 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   });
   inView.observe(canvas);
 
-  // First frame: not yet assembled, or fully assembled under reduced motion.
-  pose(rig, pointer.smoothed, options.reducedMotion ? 1 : 0, 0);
+  pose(rig, view, pointer.smoothed, assembles ? 0 : 1, 0);
   renderer.render(scene, camera);
 
   return {
-    traceEnds: traceEndsOf(model),
+    traceEnds,
+    lean(toward) {
+      if (toward === null) {
+        leanTarget.set(0, 0);
+        return;
+      }
+      leanTarget.set(
+        THREE.MathUtils.clamp(toward.x, -1, 1),
+        THREE.MathUtils.clamp(toward.y, -1, 1),
+      );
+    },
+    onFrameChange(listener) {
+      const unsubscribe = projector.subscribe(listener);
+      notify();
+      return unsubscribe;
+    },
     dispose() {
       stop();
+      projector.clear();
       inView.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('resize', resize);
