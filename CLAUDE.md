@@ -70,6 +70,7 @@ src/
   content/           MDX articles (experience/, topics/, skills/), validated by src/content.config.ts
   data/skills.ts     skills as keywords; experience tags must match a skill label exactly
   gfx/               Three.js / shader code, loaded lazily on the client
+  dom.ts             attribute names shared by markup and client scripts (hooks, states)
 ```
 
 `/skills` lists every skill as a card (`SkillCard.astro`) grouped by category, with the work

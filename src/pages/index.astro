@@ -7,6 +7,7 @@ import Card from '../components/Card.astro';
 import CpuScene from '../components/CpuScene.astro';
 import SkillChip from '../components/SkillChip.astro';
 import { skills } from '../data/skills';
+import { attr, hooks } from '../dom';
 
 const byOrder = <T extends { data: { order: number } }>(a: T, b: T) => a.data.order - b.data.order;
 
@@ -59,13 +60,12 @@ const topics = (await getCollection('topics')).sort(byOrder);
   <!-- Work: the heading is printed on the CPU lid, and a wire runs from the CPU to each job. -->
   <section id="work" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
     <div
-      data-work-board
-      data-wired-board
-      data-wires-from="(min-width: 48rem)"
+      {...attr(hooks.wiredBoard)}
+      {...attr(hooks.wiresFrom, '(min-width: 48rem)')}
       class="group relative"
     >
       <svg
-        data-wires
+        {...attr(hooks.boardWires)}
         aria-hidden="true"
         class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible opacity-0 transition-opacity duration-1000 group-data-wired:opacity-100 md:block"
       ></svg>
@@ -142,12 +142,13 @@ const topics = (await getCollection('topics')).sort(byOrder);
 </BaseLayout>
 
 <script>
+  import { hooks, selector } from '../dom';
   import { startWiredBoard } from '../gfx/wiredBoard';
 
   let dispose: (() => void) | null = null;
 
   document.addEventListener('astro:page-load', () => {
-    const board = document.querySelector<HTMLElement>('[data-work-board]');
+    const board = document.querySelector<HTMLElement>(selector(hooks.wiredBoard));
     if (board) {
       dispose = startWiredBoard(board);
     }

@@ -1,16 +1,18 @@
 /**
- * A CPU seen from above with a wire to each card around it. The markup contract:
+ * A CPU seen from above with a wire to each card around it. The markup contract, with the
+ * attribute names from `src/dom.ts`:
  *
- * - `[data-wired-board]`: the root, `position: relative`; `data-wires-from` holds the media query
- *   from which wires are drawn. The root gets `data-wired` once the wires are drawn.
- * - `svg[data-wires]`: fills the root.
- * - `canvas[data-cpu-scene]` (from `CpuScene.astro`).
- * - `[data-wire-side="left|right|bottom"]`: the cards. The active one gets `data-on`.
+ * - `hooks.wiredBoard`: the root, `position: relative`. `hooks.wiresFrom` holds the media query
+ *   from which wires are drawn. The root gets `states.wired` once the wires are drawn.
+ * - `hooks.boardWires`: an SVG that fills the root.
+ * - A `CpuScene.astro` inside the root.
+ * - `hooks.wireSide` (`left`, `right`, or `bottom`): the cards. The active one gets `states.on`.
  *
  * The card under the pointer or in focus is active; when idle, one card after another. The
  * active card gets a pulse along its wire, and the chip leans toward it.
  */
 import type { CpuHandle, ScreenTraceEnd } from './cpu';
+import { hooks, selector, states } from '../dom';
 import { pickTraceEnds, routeWires, type Side, type WireTarget } from './boardWires';
 
 /** One pulse period in the CSS of the wires (`global.css`). */
@@ -19,11 +21,11 @@ const PULSE_MS = 1600;
 const IDLE_MS = 4200;
 
 export function startWiredBoard(board: HTMLElement): () => void {
-  const svg = board.querySelector<SVGSVGElement>('svg[data-wires]')!;
-  const canvas = board.querySelector<HTMLCanvasElement>('canvas[data-cpu-scene]')!;
-  const cards = [...board.querySelectorAll<HTMLElement>('[data-wire-side]')];
-  const sides = cards.map((card) => card.dataset.wireSide as Side);
-  const wide = window.matchMedia(board.dataset.wiresFrom ?? '(min-width: 64rem)');
+  const svg = board.querySelector<SVGSVGElement>(selector(hooks.boardWires, 'svg'))!;
+  const canvas = board.querySelector<HTMLCanvasElement>(selector(hooks.cpuScene, 'canvas'))!;
+  const cards = [...board.querySelectorAll<HTMLElement>(selector(hooks.wireSide))];
+  const sides = cards.map((card) => card.getAttribute(hooks.wireSide) as Side);
+  const wide = window.matchMedia(board.getAttribute(hooks.wiresFrom) ?? '(min-width: 64rem)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let targets: WireTarget[] = [];
@@ -88,7 +90,7 @@ export function startWiredBoard(board: HTMLElement): () => void {
     picked ??= pickTraceEnds(screen, targets);
     ends = screen.map(({ x, y }) => ({ x, y }));
     draw();
-    board.dataset.wired = '';
+    board.setAttribute(states.wired, '');
   };
 
   /** Full lean toward the side of the card, and part of a lean along that side. */
@@ -105,8 +107,8 @@ export function startWiredBoard(board: HTMLElement): () => void {
   let idle: number | null = null;
   const paint = () => {
     const active = hovered ?? idle;
-    cards.forEach((card, i) => card.toggleAttribute('data-on', i === active));
-    groups.forEach((g, i) => g.toggleAttribute('data-on', i === active));
+    cards.forEach((card, i) => card.toggleAttribute(states.on, i === active));
+    groups.forEach((g, i) => g.toggleAttribute(states.on, i === active));
     const target = active === null ? undefined : targets[active];
     cpu?.lean(target ? leanToward(target) : null);
   };
@@ -116,7 +118,7 @@ export function startWiredBoard(board: HTMLElement): () => void {
   const idleTimer = reducedMotion
     ? 0
     : window.setInterval(() => {
-        if (hovered !== null || document.hidden || board.dataset.wired === undefined) {
+        if (hovered !== null || document.hidden || !board.hasAttribute(states.wired)) {
           return;
         }
         idleIndex = (idleIndex + 1) % cards.length;
