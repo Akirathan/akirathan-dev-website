@@ -4,7 +4,7 @@
  * - `[data-wired-board]`: the root, `position: relative`; `data-wires-from` holds the media query
  *   from which wires are drawn. The root gets `data-wired` once the wires are drawn.
  * - `svg[data-wires]`: fills the root.
- * - `canvas[data-cpu-scene]` (from `CpuScene.astro`, `view="top"`).
+ * - `canvas[data-cpu-scene]` (from `CpuScene.astro`).
  * - `[data-wire-side="left|right|bottom"]`: the cards. The active one gets `data-on`.
  *
  * The card under the pointer or in focus is active; when idle, one card after another. The

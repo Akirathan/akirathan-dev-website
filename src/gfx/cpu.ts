@@ -1,20 +1,20 @@
 /**
- * The CPU package on the landing page.
+ * The CPU package, seen from straight above (the Work section and the contact page).
  *
  * The body comes from CAD: `public/models/cpu.glb`, built by `scripts/build-cpu-model.mjs`
  * from the Onshape export of `cad/cpu-package.fs`. It holds the substrate, the lid, the gold
  * traces, and the capacitors, each as a named mesh. The 656 pins are not in the file: they
  * are one instanced mesh drawn here, so that the GPU can move and light every pin on its own.
  *
- * When the canvas enters the viewport the package assembles: the pins rise into the substrate
- * from the centre outwards and the lid settles on top. Afterwards it turns slowly, tilts with
- * the pointer, a signal pulse runs across the pins, and another runs out along the traces.
+ * It tilts with the pointer and leans toward the active card of its board (`lean()`). A warm
+ * light drifts over the lid, and a signal pulse runs out along the traces now and then.
  *
  * Three.js WebGPURenderer with a WebGL2 fallback; materials are TSL node materials. The CAD
  * meshes have no usable UVs, so textures are projected from local position.
  *
  * Reading guide: `startCpu()` at the bottom wires everything. Materials for the CAD parts are
- * in `dressModel()` and the `*Dressing()` functions above it, the pins in `makePins()`, and the animation inputs in `Timeline`.
+ * in `dressModel()` and the `*Dressing()` functions above it, the pins in `makePins()`, and the
+ * animation inputs in `Timeline`.
  */
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -23,7 +23,6 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import {
   abs,
   bumpMap,
-  clamp,
   color,
   float,
   fract,
@@ -48,16 +47,9 @@ import modelInfo from '../data/cpu-model.json';
 // Public API
 // ---------------------------------------------------------------------------------------------
 
-/**
- * `showcase`: three-quarter view, slow turn, assembles when it scrolls into view.
- * `top`: seen from straight above, no turn, already assembled.
- */
-export type CpuView = 'showcase' | 'top';
-
 export interface CpuOptions {
-  /** Freeze all motion and render one assembled frame only. */
+  /** Freeze all motion and render one frame only. */
   reducedMotion: boolean;
-  view?: CpuView;
   /** Glow colour of the signal pulses, hex. */
   accent: string;
   /** CSS font-family for the etched text. */
@@ -90,7 +82,7 @@ export interface ScreenTraceEnd {
 /** Gets one array that is reused for every call: copy what must outlive the call. */
 export type FrameListener = (ends: ScreenTraceEnd[]) => void;
 
-/** How far to lean on each screen axis, -1..1 (Y down); 1 is the full `TOP_LEAN`. */
+/** How far to lean on each screen axis, -1..1 (Y down); 1 is the full `LEAN`. */
 export interface LeanTarget {
   x: number;
   y: number;
@@ -101,7 +93,7 @@ export interface CpuHandle {
   traceEnds: TraceEnd[];
   /** Calls `listener` after each rendered frame and after a resize. Returns the unsubscribe. */
   onFrameChange(listener: FrameListener): () => void;
-  /** Top view: tilts the chip toward a direction on the screen; `null` returns it to rest. */
+  /** Tilts the chip toward a direction on the screen; `null` returns it to rest. */
   lean(toward: LeanTarget | null): void;
   dispose(): void;
 }
@@ -133,24 +125,14 @@ const PINS = {
   radius: 0.011,
 };
 
-/** Length of the assembly, from the first pin to the lid at rest. */
-const ASSEMBLE_MS = 2200;
-/** How far the pins and the lid start from their resting place, scene units. */
-const PIN_DROP = 1.6;
-const LID_DROP = 1.3;
-/** Yaw at the start, so that the lid print reads left to right from the camera. */
-const REST_YAW = 0.6 - Math.PI / 2;
-/** Yaw for the top view, so that the lid print reads upright. */
-const TOP_YAW = 0;
-/** Camera height of the top view for a square canvas; the package fills about 70 % of it. */
-const TOP_DISTANCE = 5.4;
-/** Largest pointer tilt of the top view, radians (about 6°). */
-const TOP_TILT = 0.1;
-/** Largest tilt of the top view toward the active contact card, per axis, radians (about 10°). */
-const TOP_LEAN = 0.17;
-/** The top view is close to the lid, so its lights are dimmer than in the showcase. */
-const TOP_LIGHT = { key: 1.4, glint: 2.5, environment: 0.3 };
-/** The moving light of the top view: height above the lid, and its reach to the sides. */
+/** Camera height for a square canvas; the package fills about 70 % of it. */
+const CAMERA_DISTANCE = 5.4;
+/** Largest tilt toward the pointer, radians (about 6°). */
+const POINTER_TILT = 0.1;
+/** Largest tilt toward the active card, per axis, radians (about 10°). */
+const LEAN = 0.17;
+const LIGHT = { key: 1.4, glint: 2.5, environment: 0.3 };
+/** The moving light: height above the lid, and its reach to the sides. */
 const GLINT = { height: 1.6, drift: 1.1, follow: 1.8 };
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/cpu.glb`;
@@ -168,26 +150,18 @@ const floatUniform = (value: number) => uniform(value);
 /**
  * The animation inputs that the shaders read.
  *
- * - `assemble` goes 0 -> 1 once, while the package assembles.
  * - `motion` is 1 normally and 0 under reduced motion; it freezes the time-based effects.
  * - `seconds` is the shader clock, already multiplied by `motion`.
  */
 interface Timeline {
-  assemble: ReturnType<typeof floatUniform>;
   motion: ReturnType<typeof floatUniform>;
   seconds: THREE.Node<'float'>;
 }
 
-function createTimeline(reducedMotion: boolean, assembles: boolean): Timeline {
-  const assemble = floatUniform(assembles ? 0 : 1);
+function createTimeline(reducedMotion: boolean): Timeline {
   const motion = floatUniform(reducedMotion ? 0 : 1);
-  return { assemble, motion, seconds: time.mul(motion) };
+  return { motion, seconds: time.mul(motion) };
 }
-
-const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
-
-/** Hermite ease, 0..1 -> 0..1, as a TSL node. */
-const smooth = (k: THREE.Node<'float'>) => k.mul(k).mul(float(3).sub(k.mul(2)));
 
 /** A short bright front with a soft tail, as a function of a phase in 0..1. */
 const pulseBand = (phase: THREE.Node<'float'>) =>
@@ -207,30 +181,25 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<THREE.WebGPURe
   return renderer;
 }
 
-function createCamera(view: CpuView): THREE.PerspectiveCamera {
+function createCamera(): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  if (view === 'top') {
-    // Up must be set before lookAt; the camera looks along it otherwise.
-    camera.up.set(0, 0, -1);
-    camera.position.set(0, TOP_DISTANCE, 0);
-  } else {
-    // A three-quarter view from above, as in a product photo.
-    camera.position.set(2.5, 2.0, 3.1);
-  }
+  // Up must be set before lookAt; the camera looks along it otherwise.
+  camera.up.set(0, 0, -1);
+  camera.position.set(0, CAMERA_DISTANCE, 0);
   camera.lookAt(0, -0.05, 0);
   return camera;
 }
 
-/** Keeps the whole package in a top view on a canvas that is taller than wide. */
-function fitTopCamera(camera: THREE.PerspectiveCamera): void {
-  camera.position.y = TOP_DISTANCE * Math.max(1, 1 / camera.aspect);
+/** Keeps the whole package in view on a canvas that is taller than wide. */
+function fitCamera(camera: THREE.PerspectiveCamera): void {
+  camera.position.y = CAMERA_DISTANCE * Math.max(1, 1 / camera.aspect);
 }
 
 /** A warm key light, a cool rim light, and the accent colour glowing up from under the pins. */
 function addLights(scene: THREE.Scene, accent: THREE.Color): THREE.DirectionalLight {
   scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x0b0e14, 0.5));
 
-  const key = new THREE.DirectionalLight(0xfff4e6, 2.4);
+  const key = new THREE.DirectionalLight(0xfff4e6, LIGHT.key);
   key.position.set(-3, 5, 2);
   scene.add(key);
 
@@ -246,7 +215,7 @@ function addLights(scene: THREE.Scene, accent: THREE.Color): THREE.DirectionalLi
 
 /** A warm point light close above the chip. Its highlight moves across the brushed lid. */
 function addGlint(scene: THREE.Scene): THREE.PointLight {
-  const glint = new THREE.PointLight(0xfff4e6, TOP_LIGHT.glint, 8, 2);
+  const glint = new THREE.PointLight(0xfff4e6, LIGHT.glint, 8, 2);
   glint.position.set(0, GLINT.height, 0);
   scene.add(glint);
   return glint;
@@ -258,7 +227,7 @@ function addEnvironment(scene: THREE.Scene, renderer: THREE.WebGPURenderer) {
   try {
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04);
     scene.environment = env.texture;
-    scene.environmentIntensity = 0.55;
+    scene.environmentIntensity = LIGHT.environment;
   } catch {
     // Lights only.
   }
@@ -484,7 +453,6 @@ function capacitorsDressing(): Dressing {
 }
 
 interface DressedModel {
-  lid: THREE.Mesh;
   dispose(): void;
 }
 
@@ -499,10 +467,9 @@ function dressModel(
   accent: THREE.Color,
   options: CpuOptions,
 ): DressedModel {
-  const lidMesh = partOf(model, 'Lid');
   const dressings: Record<string, Dressing> = {
     Substrate: substrateDressing(),
-    Lid: lidDressing(lidMesh, options),
+    Lid: lidDressing(partOf(model, 'Lid'), options),
     Traces: tracesDressing(timeline, accent),
     Capacitors: capacitorsDressing(),
   };
@@ -511,7 +478,6 @@ function dressModel(
   }
 
   return {
-    lid: lidMesh,
     dispose: () => {
       for (const dressing of Object.values(dressings)) dressing.dispose();
       model.traverse((object) => {
@@ -586,12 +552,8 @@ function makePins(timeline: Timeline, accent: THREE.Color): Part {
   );
   const reach = ((PINS.perSide - 1) / 2) * PINS.pitch * Math.SQRT2; // centre to corner
 
-  // Assembly: 0 = still far below, 1 = in place. Centre pins arrive first, corners last.
-  const distanceFromCentre = length(gridXZ).div(reach);
-  const arrival = smooth(clamp(timeline.assemble.mul(1.6).sub(distanceFromCentre.mul(0.6)), 0, 1));
   const substrateBottom = -CAD.packageThickness * MODEL_SCALE;
-  const liftY = arrival.oneMinus().mul(-PIN_DROP).add(substrateBottom);
-  material.positionNode = positionGeometry.add(vec3(gridXZ.x, liftY, gridXZ.y));
+  material.positionNode = positionGeometry.add(vec3(gridXZ.x, substrateBottom, gridXZ.y));
 
   // Signal pulse: a diagonal band that crosses the grid every few seconds.
   const diagonal = gridXZ.x
@@ -601,7 +563,7 @@ function makePins(timeline: Timeline, accent: THREE.Color): Part {
     .add(0.5); // 0 at one corner, 1 at the opposite corner
   const phase = fract(timeline.seconds.mul(0.11).sub(diagonal.mul(0.4)));
   const glow = vec3(accent.r, accent.g, accent.b);
-  material.emissiveNode = glow.mul(pulseBand(phase).mul(arrival).mul(1.4));
+  material.emissiveNode = glow.mul(pulseBand(phase).mul(1.4));
 
   const mesh = new THREE.InstancedMesh(geometry, material, count);
   // The shader moves the pins, so their bounding box is not meaningful.
@@ -638,20 +600,15 @@ function makeContactShadow(): Part & { mesh: THREE.Mesh } {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Per-frame motion on the CPU side: assembly progress, slow turn, pointer tilt
+// Per-frame motion on the CPU side: pointer tilt, lean, moving light
 // ---------------------------------------------------------------------------------------------
 
 interface Rig {
-  /** Everything that turns together. */
+  /** Everything that tilts together. */
   chip: THREE.Group;
-  /** The lid mesh inside the CAD model; its local Z is up and in metres. */
-  lid: THREE.Mesh;
-  shadow: THREE.Mesh;
-  timeline: Timeline;
   key: THREE.DirectionalLight;
-  /** Top view only. */
-  glint: THREE.PointLight | null;
-  /** Top view: the smoothed lean, as a unit-or-shorter screen direction. */
+  glint: THREE.PointLight;
+  /** The smoothed lean, -1..1 per screen axis. */
   lean: THREE.Vector2;
 }
 
@@ -673,41 +630,22 @@ function createPointer() {
   };
 }
 
-/** Sets the pose for one moment in time. `assembled` is 0..1; `seconds` is the clock. */
-function pose(
-  rig: Rig,
-  view: CpuView,
-  pointer: THREE.Vector2,
-  assembled: number,
-  seconds: number,
-): void {
-  rig.timeline.assemble.value = assembled;
-
-  // The lid starts to settle when the pins are mostly in place.
-  const lidProgress = Math.max(0, (assembled - 0.4) / 0.6);
-  rig.lid.position.z = ((1 - easeOutCubic(lidProgress)) * LID_DROP) / MODEL_SCALE;
-
-  if (view === 'top') {
-    // The edge toward the pointer or the active card dips, as if the chip faces it.
-    rig.chip.rotation.set(
-      -pointer.y * TOP_TILT + rig.lean.y * TOP_LEAN,
-      TOP_YAW,
-      -pointer.x * TOP_TILT - rig.lean.x * TOP_LEAN,
-      'XZY',
-    );
-    // The light follows the pointer and drifts on its own, so the lid never looks printed.
-    const driftX = Math.sin(seconds * 0.31) * GLINT.drift;
-    const driftZ = Math.cos(seconds * 0.23) * GLINT.drift;
-    const x = driftX + pointer.x * GLINT.follow;
-    const z = driftZ - pointer.y * GLINT.follow;
-    rig.glint?.position.set(x, GLINT.height, z);
-    rig.key.position.set(x * 2, 5, z * 2);
-    return;
-  }
-  rig.chip.rotation.y = REST_YAW + seconds * 0.16 + pointer.x * 0.35;
-  rig.chip.rotation.x = -pointer.y * 0.18;
-  rig.chip.position.y = Math.sin(seconds * 0.7) * 0.03;
-  rig.shadow.scale.setScalar(1 - rig.chip.position.y * 0.6);
+/** Sets the pose for one moment in time; `seconds` is the clock. */
+function pose(rig: Rig, pointer: THREE.Vector2, seconds: number): void {
+  // The edge toward the pointer or the active card dips, as if the chip faces it.
+  rig.chip.rotation.set(
+    -pointer.y * POINTER_TILT + rig.lean.y * LEAN,
+    0,
+    -pointer.x * POINTER_TILT - rig.lean.x * LEAN,
+    'XZY',
+  );
+  // The light follows the pointer and drifts on its own, so the lid never looks printed.
+  const driftX = Math.sin(seconds * 0.31) * GLINT.drift;
+  const driftZ = Math.cos(seconds * 0.23) * GLINT.drift;
+  const x = driftX + pointer.x * GLINT.follow;
+  const z = driftZ - pointer.y * GLINT.follow;
+  rig.glint.position.set(x, GLINT.height, z);
+  rig.key.position.set(x * 2, 5, z * 2);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -763,20 +701,14 @@ function createProjector(traceEnds: TraceEnd[]) {
 
 export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): Promise<CpuHandle> {
   const accent = new THREE.Color(options.accent);
-  const view = options.view ?? 'showcase';
-  const assembles = !options.reducedMotion && view === 'showcase';
-  const timeline = createTimeline(options.reducedMotion, assembles);
+  const timeline = createTimeline(options.reducedMotion);
 
   const [renderer, model] = await Promise.all([createRenderer(canvas), loadModel()]);
-  const camera = createCamera(view);
+  const camera = createCamera();
   const scene = new THREE.Scene();
   const key = addLights(scene, accent);
-  const glint = view === 'top' ? addGlint(scene) : null;
+  const glint = addGlint(scene);
   const disposeEnvironment = addEnvironment(scene, renderer);
-  if (view === 'top') {
-    key.intensity = TOP_LIGHT.key;
-    scene.environmentIntensity = TOP_LIGHT.environment;
-  }
 
   // Build the chip: the CAD body plus the instanced pins.
   const dressed = dressModel(model, timeline, accent, options);
@@ -786,15 +718,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   chip.add(model, pins.object);
   scene.add(chip, shadow.object);
 
-  const rig: Rig = {
-    chip,
-    lid: dressed.lid,
-    shadow: shadow.mesh,
-    timeline,
-    key,
-    glint,
-    lean: new THREE.Vector2(),
-  };
+  const rig: Rig = { chip, key, glint, lean: new THREE.Vector2() };
   const leanTarget = new THREE.Vector2();
   const pointer = createPointer();
   const traceEnds = traceEndsOf(model);
@@ -807,24 +731,17 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    if (view === 'top') {
-      fitTopCamera(camera);
-    }
+    fitCamera(camera);
     camera.updateProjectionMatrix();
     notify();
   };
   window.addEventListener('resize', resize);
   resize();
 
-  // The render loop. Assembly starts with the first animated frame, which is the first frame
-  // after the canvas scrolls into view.
-  let assembleStart: number | null = null;
   const frame = (now: number) => {
-    assembleStart ??= now;
-    const assembled = assembles ? Math.min((now - assembleStart) / ASSEMBLE_MS, 1) : 1;
     pointer.update();
     rig.lean.lerp(leanTarget, 0.06);
-    pose(rig, view, pointer.smoothed, assembled, now / 1000);
+    pose(rig, pointer.smoothed, now / 1000);
     renderer.render(scene, camera);
     notify();
   };
@@ -849,7 +766,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   });
   inView.observe(canvas);
 
-  pose(rig, view, pointer.smoothed, assembles ? 0 : 1, 0);
+  pose(rig, pointer.smoothed, 0);
   renderer.render(scene, camera);
 
   return {

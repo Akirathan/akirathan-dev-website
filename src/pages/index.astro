@@ -75,7 +75,7 @@ const topics = (await getCollection('topics')).sort(byOrder);
         <h2 class="absolute inset-0 grid place-items-center text-3xl font-bold tracking-tight transition-opacity duration-1000 group-has-[[data-ready]]:opacity-0 sm:text-4xl">
           Work
         </h2>
-        <CpuScene view="top" text={['Work']} class="h-full w-full" />
+        <CpuScene text={['Work']} class="h-full w-full" />
       </div>
       <div class="mt-6 grid gap-5 md:mt-14 md:grid-cols-3">
         {mainJobs.map((job) => (

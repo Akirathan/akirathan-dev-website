@@ -52,10 +52,7 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
     class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible opacity-0 transition-opacity duration-1000 group-data-wired:opacity-100 lg:block"
   ></svg>
 
-  <CpuScene
-    view="top"
-    class="mx-auto aspect-square w-full max-w-72 lg:col-start-2 lg:row-start-1 lg:w-[20rem] xl:w-[22rem] lg:max-w-none"
-  />
+  <CpuScene class="mx-auto aspect-square w-full max-w-72 lg:col-start-2 lg:row-start-1 lg:w-[20rem] xl:w-[22rem] lg:max-w-none" />
 
   {columns.map(([items, side]) => (
     <ul
