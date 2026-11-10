@@ -111,6 +111,71 @@
   }
 }
 
+/* Wires of a wired board (src/gfx/wiredBoard.ts). The pulse dash is 10 of 150 units on a path
+   of 100, so its head reaches the connector at 100 / 150 of the period; the connector flashes
+   then. */
+@keyframes board-pulse {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: -140;
+  }
+}
+
+@keyframes board-flash {
+  0%,
+  65% {
+    fill: var(--color-accent);
+  }
+  68% {
+    fill: white;
+  }
+  90%,
+  100% {
+    fill: var(--color-accent);
+  }
+}
+
+[data-wires] .wire {
+  fill: none;
+  stroke: color-mix(in oklab, #d9b25a 35%, transparent);
+  stroke-width: 1.25;
+  transition: stroke 300ms;
+}
+
+[data-wires] .pulse {
+  fill: none;
+  stroke: var(--color-paper);
+  stroke-width: 2;
+  stroke-dasharray: 10 140;
+  opacity: 0;
+}
+
+[data-wires] .connector {
+  fill: color-mix(in oklab, var(--color-paper) 30%, transparent);
+  transition: fill 300ms;
+}
+
+[data-wires] [data-on] .wire {
+  stroke: color-mix(in oklab, var(--color-accent) 80%, transparent);
+}
+
+[data-wires] [data-on] .connector {
+  fill: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-wires] [data-on] .pulse {
+    opacity: 1;
+    animation: board-pulse 1.6s linear infinite;
+  }
+
+  [data-wires] [data-on] .connector {
+    animation: board-flash 1.6s linear infinite;
+  }
+}
+
 /* `h2` in articles link to themselves (src/markdown/headingAnchors.ts). Unlayered, so it wins
    over the typography link colours. */
 .heading-anchor {

@@ -56,24 +56,39 @@ const topics = (await getCollection('topics')).sort(byOrder);
     />
   </section>
 
-  <!-- A procedural CPU: the one object on the page that is pure effect. -->
-  <section class="mx-auto w-full max-w-6xl px-4 sm:px-6">
-    <CpuScene class="h-[52dvh] max-h-[34rem] min-h-72" />
-  </section>
-
-  <!-- Work -->
+  <!-- Work: the heading is printed on the CPU lid, and a wire runs from the CPU to each job. -->
   <section id="work" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
-    <h2 class="reveal text-3xl font-bold tracking-tight sm:text-4xl">Work</h2>
-    <div class="mt-8 grid gap-5 md:grid-cols-3">
-      {mainJobs.map((job) => (
-        <Card
-          href={`/work/${job.id}`}
-          eyebrow={job.data.period}
-          title={job.data.company}
-          meta={job.data.role}
-          bullets={job.data.summary}
-        />
-      ))}
+    <div
+      data-work-board
+      data-wired-board
+      data-wires-from="(min-width: 48rem)"
+      class="group relative"
+    >
+      <svg
+        data-wires
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible opacity-0 transition-opacity duration-1000 group-data-wired:opacity-100 md:block"
+      ></svg>
+      <div class="relative mx-auto aspect-square w-44 md:w-52">
+        <!-- Without a GPU the heading shows in place of the chip; with one it only fades from
+             view and stays in the accessibility tree. -->
+        <h2 class="absolute inset-0 grid place-items-center text-3xl font-bold tracking-tight transition-opacity duration-1000 group-has-[[data-ready]]:opacity-0 sm:text-4xl">
+          Work
+        </h2>
+        <CpuScene view="top" text={['Work']} class="h-full w-full" />
+      </div>
+      <div class="mt-6 grid gap-5 md:mt-14 md:grid-cols-3">
+        {mainJobs.map((job) => (
+          <Card
+            wireSide="bottom"
+            href={`/work/${job.id}`}
+            eyebrow={job.data.period}
+            title={job.data.company}
+            meta={job.data.role}
+            bullets={job.data.summary}
+          />
+        ))}
+      </div>
     </div>
     {minorJobs.length > 0 && (
       <p class="reveal mt-6 text-sm text-muted">
@@ -125,3 +140,21 @@ const topics = (await getCollection('topics')).sort(byOrder);
     </div>
   </section>
 </BaseLayout>
+
+<script>
+  import { startWiredBoard } from '../gfx/wiredBoard';
+
+  let dispose: (() => void) | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    const board = document.querySelector<HTMLElement>('[data-work-board]');
+    if (board) {
+      dispose = startWiredBoard(board);
+    }
+  });
+
+  document.addEventListener('astro:before-swap', () => {
+    dispose?.();
+    dispose = null;
+  });
+</script>

@@ -62,8 +62,8 @@ export interface CpuOptions {
   accent: string;
   /** CSS font-family for the etched text. */
   headingFont: string;
-  /** Lines etched into the lid, large to small. */
-  text: [string, string, string];
+  /** Etched into the lid: one large word, or three lines from large to small. */
+  text: [string] | [string, string, string];
 }
 
 /** Where a trace meets the substrate edge, in the chip's frame (scene units, Y up). */
@@ -333,11 +333,15 @@ function drawLidTexture(options: CpuOptions): THREE.CanvasTexture {
   ctx.closePath();
   ctx.fill();
 
-  // Etched text, three lines.
-  const [big, mid, small] = options.text;
   ctx.fillStyle = `${etch}0.78)`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  if (options.text.length === 1) {
+    ctx.font = `800 260px ${options.headingFont}`;
+    ctx.fillText(options.text[0], size / 2, size / 2 + 20);
+    return lidTexture(canvas);
+  }
+  const [big, mid, small] = options.text;
   ctx.font = `800 118px ${options.headingFont}`;
   ctx.fillText(big.toUpperCase(), size / 2, 400);
   ctx.font = `600 78px ${options.headingFont}`;
@@ -345,7 +349,10 @@ function drawLidTexture(options: CpuOptions): THREE.CanvasTexture {
   ctx.font = `600 40px ${options.headingFont}`;
   ctx.letterSpacing = '10px';
   ctx.fillText(small.toUpperCase(), size / 2, 640);
+  return lidTexture(canvas);
+}
 
+function lidTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;

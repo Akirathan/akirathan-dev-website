@@ -6,20 +6,26 @@
  *
  * When the scene runs, the canvas dispatches `cpu:ready` with the `CpuHandle` as `detail`.
  */
-import type { CpuView } from '../gfx/cpu';
+import type { CpuOptions, CpuView } from '../gfx/cpu';
 
 interface Props {
   class?: string;
   view?: CpuView;
+  text?: CpuOptions['text'];
 }
 
-const { class: className, view = 'showcase' } = Astro.props;
+const {
+  class: className,
+  view = 'showcase',
+  text = ['Pavel Marek', 'akirathan.dev', 'Senior SW engineer'],
+} = Astro.props;
 ---
 
 <div class:list={['relative', className]} aria-hidden="true">
   <canvas
     data-cpu-scene
     data-view={view}
+    data-text={JSON.stringify(text)}
     class="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-1000 data-ready:opacity-100"
   ></canvas>
 </div>
@@ -55,7 +61,7 @@ const { class: className, view = 'showcase' } = Astro.props;
           view: canvas.dataset.view === 'top' ? 'top' : 'showcase',
           accent: themeColorHex('--color-accent', '#a9d5b5'),
           headingFont,
-          text: ['Pavel Marek', 'akirathan.dev', 'Senior SW engineer'],
+          text: JSON.parse(canvas.dataset.text ?? '[""]'),
         });
         handles.push(handle);
         canvas.dataset.ready = '';
