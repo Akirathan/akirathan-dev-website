@@ -210,6 +210,8 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
 
     let targets: WireTarget[] = [];
     let canvasOffset = { x: 0, y: 0 };
+    let canvasSize = { width: 0, height: 0 };
+    let cpu: CpuHandle | null = null;
     let picked: number[] | null = null;
     let ends: { x: number; y: number }[] = [];
     let groups: SVGGElement[] = [];
@@ -219,6 +221,7 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
       svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
       const c = canvas.getBoundingClientRect();
       canvasOffset = { x: c.left - box.left, y: c.top - box.top };
+      canvasSize = { width: c.width, height: c.height };
       targets = items.map((li) => {
         const r = li.firstElementChild!.getBoundingClientRect();
         const side = li.dataset.side === 'left' ? 'left' : 'right';
@@ -274,6 +277,15 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
       const active = hovered ?? idle;
       items.forEach((li, i) => li.toggleAttribute('data-on', i === active));
       groups.forEach((g, i) => g.toggleAttribute('data-on', i === active));
+      const target = active === null ? undefined : targets[active];
+      cpu?.lean(
+        target
+          ? {
+              x: target.x - (canvasOffset.x + canvasSize.width / 2),
+              y: target.y - (canvasOffset.y + canvasSize.height / 2),
+            }
+          : null,
+      );
     };
 
     let idleIndex = -1;
@@ -318,7 +330,8 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
     const onReady = (event: Event) => {
       build();
       measure();
-      unsubscribe = (event as CustomEvent<CpuHandle>).detail.onFrameChange(onFrame);
+      cpu = (event as CustomEvent<CpuHandle>).detail;
+      unsubscribe = cpu.onFrameChange(onFrame);
     };
     canvas.addEventListener('cpu:ready', onReady, { once: true });
 
@@ -331,6 +344,7 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
     return () => {
       canvas.removeEventListener('cpu:ready', onReady);
       unsubscribe?.();
+      cpu = null;
       resize.disconnect();
       window.clearInterval(idleTimer);
       window.clearTimeout(idleOff);

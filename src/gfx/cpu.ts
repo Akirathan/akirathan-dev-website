@@ -90,11 +90,19 @@ export interface ScreenTraceEnd {
 /** Gets one array that is reused for every call: copy what must outlive the call. */
 export type FrameListener = (ends: ScreenTraceEnd[]) => void;
 
+/** A screen direction from the centre of the chip, CSS pixel axes (Y down); any length. */
+export interface LeanTarget {
+  x: number;
+  y: number;
+}
+
 export interface CpuHandle {
   /** The 56 trace ends, for paths that continue outside the chip. */
   traceEnds: TraceEnd[];
   /** Calls `listener` after each rendered frame and after a resize. Returns the unsubscribe. */
   onFrameChange(listener: FrameListener): () => void;
+  /** Top view: tilts the chip toward a direction on the screen; `null` returns it to rest. */
+  lean(toward: LeanTarget | null): void;
   dispose(): void;
 }
 
@@ -138,6 +146,10 @@ const TOP_YAW = 0;
 const TOP_DISTANCE = 5.4;
 /** Largest pointer tilt of the top view, radians. Small, so that the wire ends stay close. */
 const TOP_TILT = 0.06;
+/** Tilt of the top view toward the active contact card, radians (about 5°). */
+const TOP_LEAN = 0.09;
+/** The moving light of the top view: height above the lid, and its reach to the sides. */
+const GLINT = { height: 1.6, drift: 1.1, follow: 1.8 };
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/cpu.glb`;
 /** Size of one repeat of the weave tile on the substrate, metres (8 cells of 0.4 mm). */
@@ -213,7 +225,7 @@ function fitTopCamera(camera: THREE.PerspectiveCamera): void {
 }
 
 /** A warm key light, a cool rim light, and the accent colour glowing up from under the pins. */
-function addLights(scene: THREE.Scene, accent: THREE.Color): void {
+function addLights(scene: THREE.Scene, accent: THREE.Color): THREE.DirectionalLight {
   scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x0b0e14, 0.5));
 
   const key = new THREE.DirectionalLight(0xfff4e6, 2.4);
@@ -227,6 +239,15 @@ function addLights(scene: THREE.Scene, accent: THREE.Color): void {
   const under = new THREE.PointLight(accent, 6, 4, 2);
   under.position.set(0, -0.9, 0);
   scene.add(under);
+  return key;
+}
+
+/** A warm point light close above the chip. Its highlight moves across the brushed lid. */
+function addGlint(scene: THREE.Scene): THREE.PointLight {
+  const glint = new THREE.PointLight(0xfff4e6, 5, 8, 2);
+  glint.position.set(0, GLINT.height, 0);
+  scene.add(glint);
+  return glint;
 }
 
 /** Soft studio reflections for the metal. Returns a dispose function. */
@@ -618,6 +639,11 @@ interface Rig {
   lid: THREE.Mesh;
   shadow: THREE.Mesh;
   timeline: Timeline;
+  key: THREE.DirectionalLight;
+  /** Top view only. */
+  glint: THREE.PointLight | null;
+  /** Top view: the smoothed lean, as a unit-or-shorter screen direction. */
+  lean: THREE.Vector2;
 }
 
 /** Reads the pointer in clip space (-1..1) and smooths it, so the tilt lags a little. */
@@ -653,7 +679,20 @@ function pose(
   rig.lid.position.z = ((1 - easeOutCubic(lidProgress)) * LID_DROP) / MODEL_SCALE;
 
   if (view === 'top') {
-    rig.chip.rotation.set(-pointer.y * TOP_TILT, TOP_YAW, -pointer.x * TOP_TILT, 'XZY');
+    // The edge toward the pointer or the active card dips, as if the chip faces it.
+    rig.chip.rotation.set(
+      -pointer.y * TOP_TILT + rig.lean.y * TOP_LEAN,
+      TOP_YAW,
+      -pointer.x * TOP_TILT - rig.lean.x * TOP_LEAN,
+      'XZY',
+    );
+    // The light follows the pointer and drifts on its own, so the lid never looks printed.
+    const driftX = Math.sin(seconds * 0.31) * GLINT.drift;
+    const driftZ = Math.cos(seconds * 0.23) * GLINT.drift;
+    const x = driftX + pointer.x * GLINT.follow;
+    const z = driftZ - pointer.y * GLINT.follow;
+    rig.glint?.position.set(x, GLINT.height, z);
+    rig.key.position.set(x * 2, 5, z * 2);
     return;
   }
   rig.chip.rotation.y = REST_YAW + seconds * 0.16 + pointer.x * 0.35;
@@ -722,7 +761,8 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   const [renderer, model] = await Promise.all([createRenderer(canvas), loadModel()]);
   const camera = createCamera(view);
   const scene = new THREE.Scene();
-  addLights(scene, accent);
+  const key = addLights(scene, accent);
+  const glint = view === 'top' ? addGlint(scene) : null;
   const disposeEnvironment = addEnvironment(scene, renderer);
 
   // Build the chip: the CAD body plus the instanced pins.
@@ -733,7 +773,16 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   chip.add(model, pins.object);
   scene.add(chip, shadow.object);
 
-  const rig: Rig = { chip, lid: dressed.lid, shadow: shadow.mesh, timeline };
+  const rig: Rig = {
+    chip,
+    lid: dressed.lid,
+    shadow: shadow.mesh,
+    timeline,
+    key,
+    glint,
+    lean: new THREE.Vector2(),
+  };
+  const leanTarget = new THREE.Vector2();
   const pointer = createPointer();
   const traceEnds = traceEndsOf(model);
   const projector = createProjector(traceEnds);
@@ -761,6 +810,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     assembleStart ??= now;
     const assembled = assembles ? Math.min((now - assembleStart) / ASSEMBLE_MS, 1) : 1;
     pointer.update();
+    rig.lean.lerp(leanTarget, 0.06);
     pose(rig, view, pointer.smoothed, assembled, now / 1000);
     renderer.render(scene, camera);
     notify();
@@ -791,6 +841,16 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
 
   return {
     traceEnds,
+    lean(toward) {
+      if (toward === null) {
+        leanTarget.set(0, 0);
+        return;
+      }
+      leanTarget.set(toward.x, toward.y);
+      if (leanTarget.lengthSq() > 0) {
+        leanTarget.normalize();
+      }
+    },
     onFrameChange(listener) {
       const unsubscribe = projector.subscribe(listener);
       notify();
