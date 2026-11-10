@@ -42,17 +42,17 @@ const morph = (part: string) =>
       'w-full',
       // The outline takes the left gutter. The article stays centred while the gutter is wide
       // enough, and moves to the right on narrower screens.
-      hasOutline && 'xl:grid xl:grid-cols-[minmax(17rem,1fr)_minmax(0,48rem)_minmax(0,1fr)]',
+      hasOutline && 'lg:grid lg:grid-cols-[minmax(17rem,1fr)_minmax(0,48rem)_minmax(0,1fr)]',
     ]}
   >
     {hasOutline && (
-      <aside class="hidden xl:block">
+      <aside class="hidden lg:block">
         <div class="sticky top-0 flex h-dvh items-center justify-end pr-2 pl-4">
           <Outline headings={sections} />
         </div>
       </aside>
     )}
-    <article class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-16 xl:col-start-2">
+    <article class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6 sm:py-16 lg:col-start-2">
       <a
         href={backHref}
         data-nav="back"

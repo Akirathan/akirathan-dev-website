@@ -83,7 +83,7 @@ meter in its card on `/skills` by setting `expertise` (integer 1-10) in `skills.
 segments fill with a CSS animation when the card comes into view (an `IntersectionObserver` in
 `skills.astro` sets `data-inview` on the list item; the cards rise on the same signal).
 
-Article pages with two or more `h2` headings get an outline in the left gutter from the `xl`
+Article pages with two or more `h2` headings get an outline in the left gutter from the `lg`
 breakpoint (`Outline.astro`, drawn by `src/gfx/outline.ts`): an SVG chip with one wire per
 heading, 45° turns. The item of the section in view, or under the pointer, gets `data-on`; CSS
 lights its wire, runs the pulses, and plays the shared `trace-border` (also used by
