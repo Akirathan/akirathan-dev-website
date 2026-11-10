@@ -1,4 +1,7 @@
 ---
+import { attr, hooks } from '../dom';
+import type { Side } from '../gfx/boardWires';
+
 /** Landing-page card: a title, an optional eyebrow, up to four bullets, and a link to details. */
 interface Props {
   href: string;
@@ -7,14 +10,17 @@ interface Props {
   meta?: string;
   bullets: string[];
   cta?: string;
+  /** Wired board side (src/gfx/wiredBoard.ts), when the card hangs on a wire. */
+  wireSide?: Side;
 }
 
-const { href, title, eyebrow, meta, bullets, cta = 'Read more' } = Astro.props;
+const { href, title, eyebrow, meta, bullets, cta = 'Read more', wireSide } = Astro.props;
 ---
 
 <a
   href={href}
-  class="group reveal relative flex h-full flex-col rounded-2xl border border-paper/10 bg-ink-soft/60 p-6 backdrop-blur-sm transition-[border-color,translate,box-shadow] duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-[0_20px_60px_-30px_var(--color-accent)]"
+  {...(wireSide ? attr(hooks.wireSide, wireSide) : {})}
+  class="group reveal relative flex h-full flex-col rounded-2xl border border-paper/10 bg-ink-soft/60 p-6 backdrop-blur-sm transition-[border-color,translate,box-shadow] duration-300 hover:-translate-y-1 hover:border-accent/40 data-on:border-accent/40 hover:shadow-[0_20px_60px_-30px_var(--color-accent)]"
 >
   {eyebrow && <p class="text-xs font-medium tracking-widest text-accent uppercase">{eyebrow}</p>}
   <h3 class="mt-1 text-2xl font-semibold tracking-tight">{title}</h3>
