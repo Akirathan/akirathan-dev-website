@@ -48,7 +48,10 @@ import modelInfo from '../data/cpu-model.json';
 // Public API
 // ---------------------------------------------------------------------------------------------
 
-/** `showcase`: three-quarter view, slow turn. `top`: seen from straight above, no turn. */
+/**
+ * `showcase`: three-quarter view, slow turn, assembles when it scrolls into view.
+ * `top`: seen from straight above, no turn, already assembled.
+ */
 export type CpuView = 'showcase' | 'top';
 
 export interface CpuOptions {
@@ -161,8 +164,8 @@ interface Timeline {
   seconds: THREE.Node<'float'>;
 }
 
-function createTimeline(reducedMotion: boolean): Timeline {
-  const assemble = floatUniform(reducedMotion ? 1 : 0);
+function createTimeline(reducedMotion: boolean, assembles: boolean): Timeline {
+  const assemble = floatUniform(assembles ? 0 : 1);
   const motion = floatUniform(reducedMotion ? 0 : 1);
   return { assemble, motion, seconds: time.mul(motion) };
 }
@@ -712,10 +715,11 @@ function createProjector(traceEnds: TraceEnd[]) {
 
 export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): Promise<CpuHandle> {
   const accent = new THREE.Color(options.accent);
-  const timeline = createTimeline(options.reducedMotion);
+  const view = options.view ?? 'showcase';
+  const assembles = !options.reducedMotion && view === 'showcase';
+  const timeline = createTimeline(options.reducedMotion, assembles);
 
   const [renderer, model] = await Promise.all([createRenderer(canvas), loadModel()]);
-  const view = options.view ?? 'showcase';
   const camera = createCamera(view);
   const scene = new THREE.Scene();
   addLights(scene, accent);
@@ -755,7 +759,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   let assembleStart: number | null = null;
   const frame = (now: number) => {
     assembleStart ??= now;
-    const assembled = Math.min((now - assembleStart) / ASSEMBLE_MS, 1);
+    const assembled = assembles ? Math.min((now - assembleStart) / ASSEMBLE_MS, 1) : 1;
     pointer.update();
     pose(rig, view, pointer.smoothed, assembled, now / 1000);
     renderer.render(scene, camera);
@@ -782,8 +786,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   });
   inView.observe(canvas);
 
-  // First frame: not yet assembled, or fully assembled under reduced motion.
-  pose(rig, view, pointer.smoothed, options.reducedMotion ? 1 : 0, 0);
+  pose(rig, view, pointer.smoothed, assembles ? 0 : 1, 0);
   renderer.render(scene, camera);
 
   return {
