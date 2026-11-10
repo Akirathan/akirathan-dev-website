@@ -61,7 +61,9 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
               <span class="block text-xs font-medium tracking-widest text-accent uppercase">
                 {item.label}
               </span>
-              <span class="mt-1 block break-words text-paper">{item.value}</span>
+              {[item.value].flat().map((line, i) => (
+                <span class:list={['block break-words text-paper', i === 0 && 'mt-1']}>{line}</span>
+              ))}
             </Tag>
           </li>
         );

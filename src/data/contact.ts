@@ -1,6 +1,7 @@
 export interface ContactItem {
   label: string;
-  value: string;
+  /** One line, or several lines. */
+  value: string | string[];
   /** Without `href`, the item is plain text. */
   href?: string;
   external?: boolean;
@@ -23,6 +24,11 @@ export const contactItems: ContactItem[] = [
     side: 'left',
   },
   {
+    label: 'Languages',
+    value: ['English: professional', 'German: B2', 'Czech: native'],
+    side: 'left',
+  },
+  {
     label: 'LinkedIn',
     value: 'in/pavel-marek-56a517140',
     href: 'https://www.linkedin.com/in/pavel-marek-56a517140/',
@@ -32,6 +38,11 @@ export const contactItems: ContactItem[] = [
   {
     label: 'Location',
     value: 'Brno, Czechia',
+    side: 'right',
+  },
+  {
+    label: 'Time zone',
+    value: ['CET (UTC+1)', 'CEST (UTC+2) in summer'],
     side: 'right',
   },
 ];
