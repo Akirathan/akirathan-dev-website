@@ -1,0 +1,308 @@
+---
+import CpuScene from './CpuScene.astro';
+import { contactItems, type ContactItem } from '../data/contact';
+
+/**
+ * The contact items around a CPU seen from above. From the `lg` breakpoint, a wire runs from a
+ * trace end of the CPU to each card; the card under the pointer (or, when idle, one card after
+ * another) gets a pulse along its wire. Without a GPU, or on narrow screens, the cards stand on
+ * their own.
+ */
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+
+const left = contactItems.filter((item) => item.side === 'left');
+const right = contactItems.filter((item) => item.side === 'right');
+const columns: [ContactItem[], 'left' | 'right'][] = [
+  [left, 'left'],
+  [right, 'right'],
+];
+---
+
+<div
+  data-contact-board
+  class:list={[
+    'group relative grid gap-6 lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-x-12 xl:gap-x-16',
+    className,
+  ]}
+>
+  <svg
+    aria-hidden="true"
+    class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible opacity-0 transition-opacity duration-1000 group-data-wired:opacity-100 lg:block"
+  ></svg>
+
+  <CpuScene
+    view="top"
+    class="mx-auto aspect-square w-full max-w-72 lg:col-start-2 lg:row-start-1 lg:w-[20rem] xl:w-[22rem] lg:max-w-none"
+  />
+
+  {columns.map(([items, side]) => (
+    <ul
+      class:list={[
+        'grid gap-4 sm:grid-cols-2 lg:row-start-1 lg:grid-cols-1 lg:gap-6',
+        side === 'left' ? 'lg:col-start-1' : 'lg:col-start-3',
+      ]}
+    >
+      {items.map((item) => {
+        const Tag = item.href ? 'a' : 'div';
+        return (
+          <li data-side={side}>
+            <Tag
+              href={item.href}
+              {...(item.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+              class:list={[
+                'trace-border relative block rounded-xl border border-paper/10 bg-ink-soft/60 px-5 py-4 lg:px-4 xl:px-5 backdrop-blur-sm transition-colors duration-300',
+                side === 'left' && 'lg:text-right',
+              ]}
+            >
+              <span class="block text-xs font-medium tracking-widest text-accent uppercase">
+                {item.label}
+              </span>
+              <span class="mt-1 block break-words text-paper">{item.value}</span>
+            </Tag>
+          </li>
+        );
+      })}
+    </ul>
+  ))}
+</div>
+
+<style>
+  [data-contact-board] li > :hover,
+  [data-contact-board] li[data-on] > * {
+    border-color: color-mix(in oklab, var(--color-accent) 60%, transparent);
+  }
+
+  /* The pulse dash is 10 of 150 units on a path of 100, so its head reaches the connector at
+     100 / 150 of the period. The connector flashes then. */
+  @keyframes contact-pulse {
+    from {
+      stroke-dashoffset: 10;
+    }
+    to {
+      stroke-dashoffset: -140;
+    }
+  }
+
+  @keyframes contact-flash {
+    0%,
+    65% {
+      fill: var(--color-accent);
+    }
+    68% {
+      fill: white;
+    }
+    90%,
+    100% {
+      fill: var(--color-accent);
+    }
+  }
+
+  [data-contact-board] :global(.wire) {
+    fill: none;
+    stroke: color-mix(in oklab, #d9b25a 35%, transparent);
+    stroke-width: 1.25;
+    transition: stroke 300ms;
+  }
+
+  [data-contact-board] :global(.pulse) {
+    fill: none;
+    stroke: var(--color-paper);
+    stroke-width: 2;
+    stroke-dasharray: 10 140;
+    opacity: 0;
+  }
+
+  [data-contact-board] :global(.connector) {
+    fill: color-mix(in oklab, var(--color-paper) 30%, transparent);
+    transition: fill 300ms;
+  }
+
+  [data-contact-board] :global([data-on] .wire) {
+    stroke: color-mix(in oklab, var(--color-accent) 80%, transparent);
+  }
+
+  [data-contact-board] :global([data-on] .connector) {
+    fill: var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    [data-contact-board] li > :hover::before,
+    [data-contact-board] li[data-on] > *::before {
+      animation: trace 1.4s cubic-bezier(0.45, 0, 0.3, 1);
+    }
+
+    [data-contact-board] :global([data-on] .pulse) {
+      opacity: 1;
+      animation: contact-pulse 1.6s linear infinite;
+    }
+
+    [data-contact-board] :global([data-on] .connector) {
+      animation: contact-flash 1.6s linear infinite;
+    }
+  }
+</style>
+
+<script>
+  import type { CpuHandle, ScreenTraceEnd } from '../gfx/cpu';
+  import { pickTraceEnds, routeWires, type WireTarget } from '../gfx/contactWires';
+
+  /** One pulse period in the CSS above. */
+  const PULSE_MS = 1600;
+  /** Time between two idle pulses. */
+  const IDLE_MS = 4200;
+
+  let dispose: (() => void) | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    const board = document.querySelector<HTMLElement>('[data-contact-board]');
+    if (board) {
+      dispose = startBoard(board);
+    }
+  });
+
+  document.addEventListener('astro:before-swap', () => {
+    dispose?.();
+    dispose = null;
+  });
+
+  function startBoard(board: HTMLElement): () => void {
+    const svg = board.querySelector('svg')!;
+    const canvas = board.querySelector<HTMLCanvasElement>('canvas[data-cpu-scene]')!;
+    const items = [...board.querySelectorAll<HTMLLIElement>('li[data-side]')];
+    const wide = window.matchMedia('(min-width: 64rem)');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    let targets: WireTarget[] = [];
+    let canvasOffset = { x: 0, y: 0 };
+    let picked: number[] | null = null;
+    let ends: { x: number; y: number }[] = [];
+    let groups: SVGGElement[] = [];
+
+    const measure = () => {
+      const box = board.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
+      const c = canvas.getBoundingClientRect();
+      canvasOffset = { x: c.left - box.left, y: c.top - box.top };
+      targets = items.map((li) => {
+        const r = li.firstElementChild!.getBoundingClientRect();
+        const side = li.dataset.side === 'left' ? 'left' : 'right';
+        return {
+          side,
+          x: (side === 'left' ? r.right : r.left) - box.left,
+          y: r.top + r.height / 2 - box.top,
+        };
+      });
+    };
+
+    const build = () => {
+      svg.innerHTML = items
+        .map(
+          (_, i) =>
+            `<g data-item="${i}"><path class="wire"/><path class="pulse" pathLength="100"/>` +
+            `<rect class="connector" rx="1"/></g>`,
+        )
+        .join('');
+      groups = [...svg.querySelectorAll<SVGGElement>('g')];
+    };
+
+    const draw = () => {
+      if (!wide.matches || !picked || ends.length === 0) {
+        return;
+      }
+      const starts = picked.map((p) => ({
+        x: canvasOffset.x + (ends[p]?.x ?? 0),
+        y: canvasOffset.y + (ends[p]?.y ?? 0),
+      }));
+      routeWires(starts, targets).forEach((wire, i) => {
+        const [path, pulse, connector] = groups[i].children;
+        path.setAttribute('d', wire.d);
+        pulse.setAttribute('d', wire.d);
+        connector.setAttribute('x', `${wire.connector.x}`);
+        connector.setAttribute('y', `${wire.connector.y}`);
+        connector.setAttribute('width', `${wire.connector.width}`);
+        connector.setAttribute('height', `${wire.connector.height}`);
+      });
+    };
+
+    const onFrame = (screen: ScreenTraceEnd[]) => {
+      picked ??= pickTraceEnds(screen, targets);
+      ends = screen.map(({ x, y }) => ({ x, y }));
+      draw();
+      board.dataset.wired = '';
+    };
+
+    // Lights: a hovered or focused card wins; otherwise one card after another, now and then.
+    let hovered: number | null = null;
+    let idle: number | null = null;
+    const paint = () => {
+      const active = hovered ?? idle;
+      items.forEach((li, i) => li.toggleAttribute('data-on', i === active));
+      groups.forEach((g, i) => g.toggleAttribute('data-on', i === active));
+    };
+
+    let idleIndex = -1;
+    let idleOff = 0;
+    const idleTimer = reducedMotion
+      ? 0
+      : window.setInterval(() => {
+          if (hovered !== null || document.hidden || board.dataset.wired === undefined) {
+            return;
+          }
+          idleIndex = (idleIndex + 1) % items.length;
+          idle = idleIndex;
+          paint();
+          idleOff = window.setTimeout(() => {
+            idle = null;
+            paint();
+          }, PULSE_MS);
+        }, IDLE_MS);
+
+    const listeners = items.map((li, i) => {
+      const enter = () => {
+        hovered = i;
+        paint();
+      };
+      const leave = () => {
+        hovered = null;
+        paint();
+      };
+      li.addEventListener('pointerenter', enter);
+      li.addEventListener('pointerleave', leave);
+      li.addEventListener('focusin', enter);
+      li.addEventListener('focusout', leave);
+      return () => {
+        li.removeEventListener('pointerenter', enter);
+        li.removeEventListener('pointerleave', leave);
+        li.removeEventListener('focusin', enter);
+        li.removeEventListener('focusout', leave);
+      };
+    });
+
+    let unsubscribe: (() => void) | null = null;
+    const onReady = (event: Event) => {
+      build();
+      measure();
+      unsubscribe = (event as CustomEvent<CpuHandle>).detail.onFrameChange(onFrame);
+    };
+    canvas.addEventListener('cpu:ready', onReady, { once: true });
+
+    const resize = new ResizeObserver(() => {
+      measure();
+      draw();
+    });
+    resize.observe(board);
+
+    return () => {
+      canvas.removeEventListener('cpu:ready', onReady);
+      unsubscribe?.();
+      resize.disconnect();
+      window.clearInterval(idleTimer);
+      window.clearTimeout(idleOff);
+      listeners.forEach((remove) => remove());
+    };
+  }
+</script>

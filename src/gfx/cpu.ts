@@ -48,9 +48,13 @@ import modelInfo from '../data/cpu-model.json';
 // Public API
 // ---------------------------------------------------------------------------------------------
 
+/** `showcase`: three-quarter view, slow turn. `top`: seen from straight above, no turn. */
+export type CpuView = 'showcase' | 'top';
+
 export interface CpuOptions {
   /** Freeze all motion and render one assembled frame only. */
   reducedMotion: boolean;
+  view?: CpuView;
   /** Glow colour of the signal pulses, hex. */
   accent: string;
   /** CSS font-family for the etched text. */
@@ -125,6 +129,12 @@ const PIN_DROP = 1.6;
 const LID_DROP = 1.3;
 /** Yaw at the start, so that the lid print reads left to right from the camera. */
 const REST_YAW = 0.6 - Math.PI / 2;
+/** Yaw for the top view, so that the lid print reads upright. */
+const TOP_YAW = 0;
+/** Camera height of the top view for a square canvas; the package fills about 70 % of it. */
+const TOP_DISTANCE = 5.4;
+/** Largest pointer tilt of the top view, radians. Small, so that the wire ends stay close. */
+const TOP_TILT = 0.06;
 
 const MODEL_URL = `${import.meta.env.BASE_URL}models/cpu.glb`;
 /** Size of one repeat of the weave tile on the substrate, metres (8 cells of 0.4 mm). */
@@ -180,12 +190,23 @@ async function createRenderer(canvas: HTMLCanvasElement): Promise<THREE.WebGPURe
   return renderer;
 }
 
-/** A three-quarter view from above, as in a product photo. */
-function createCamera(): THREE.PerspectiveCamera {
+function createCamera(view: CpuView): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-  camera.position.set(2.5, 2.0, 3.1);
+  if (view === 'top') {
+    // Up must be set before lookAt; the camera looks along it otherwise.
+    camera.up.set(0, 0, -1);
+    camera.position.set(0, TOP_DISTANCE, 0);
+  } else {
+    // A three-quarter view from above, as in a product photo.
+    camera.position.set(2.5, 2.0, 3.1);
+  }
   camera.lookAt(0, -0.05, 0);
   return camera;
+}
+
+/** Keeps the whole package in a top view on a canvas that is taller than wide. */
+function fitTopCamera(camera: THREE.PerspectiveCamera): void {
+  camera.position.y = TOP_DISTANCE * Math.max(1, 1 / camera.aspect);
 }
 
 /** A warm key light, a cool rim light, and the accent colour glowing up from under the pins. */
@@ -615,13 +636,23 @@ function createPointer() {
 }
 
 /** Sets the pose for one moment in time. `assembled` is 0..1; `seconds` is the clock. */
-function pose(rig: Rig, pointer: THREE.Vector2, assembled: number, seconds: number): void {
+function pose(
+  rig: Rig,
+  view: CpuView,
+  pointer: THREE.Vector2,
+  assembled: number,
+  seconds: number,
+): void {
   rig.timeline.assemble.value = assembled;
 
   // The lid starts to settle when the pins are mostly in place.
   const lidProgress = Math.max(0, (assembled - 0.4) / 0.6);
   rig.lid.position.z = ((1 - easeOutCubic(lidProgress)) * LID_DROP) / MODEL_SCALE;
 
+  if (view === 'top') {
+    rig.chip.rotation.set(-pointer.y * TOP_TILT, TOP_YAW, -pointer.x * TOP_TILT, 'XZY');
+    return;
+  }
   rig.chip.rotation.y = REST_YAW + seconds * 0.16 + pointer.x * 0.35;
   rig.chip.rotation.x = -pointer.y * 0.18;
   rig.chip.position.y = Math.sin(seconds * 0.7) * 0.03;
@@ -684,7 +715,8 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   const timeline = createTimeline(options.reducedMotion);
 
   const [renderer, model] = await Promise.all([createRenderer(canvas), loadModel()]);
-  const camera = createCamera();
+  const view = options.view ?? 'showcase';
+  const camera = createCamera(view);
   const scene = new THREE.Scene();
   addLights(scene, accent);
   const disposeEnvironment = addEnvironment(scene, renderer);
@@ -709,6 +741,9 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    if (view === 'top') {
+      fitTopCamera(camera);
+    }
     camera.updateProjectionMatrix();
     notify();
   };
@@ -722,7 +757,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     assembleStart ??= now;
     const assembled = Math.min((now - assembleStart) / ASSEMBLE_MS, 1);
     pointer.update();
-    pose(rig, pointer.smoothed, assembled, now / 1000);
+    pose(rig, view, pointer.smoothed, assembled, now / 1000);
     renderer.render(scene, camera);
     notify();
   };
@@ -748,7 +783,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   inView.observe(canvas);
 
   // First frame: not yet assembled, or fully assembled under reduced motion.
-  pose(rig, pointer.smoothed, options.reducedMotion ? 1 : 0, 0);
+  pose(rig, view, pointer.smoothed, options.reducedMotion ? 1 : 0, 0);
   renderer.render(scene, camera);
 
   return {

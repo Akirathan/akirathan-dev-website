@@ -3,17 +3,23 @@
  * A procedural CPU that assembles when scrolled into view, then turns slowly and follows the
  * pointer. Decorative: reserve the space with the `class` prop (height), nothing else is
  * needed. Without a GPU the space stays empty.
+ *
+ * When the scene runs, the canvas dispatches `cpu:ready` with the `CpuHandle` as `detail`.
  */
+import type { CpuView } from '../gfx/cpu';
+
 interface Props {
   class?: string;
+  view?: CpuView;
 }
 
-const { class: className } = Astro.props;
+const { class: className, view = 'showcase' } = Astro.props;
 ---
 
 <div class:list={['relative', className]} aria-hidden="true">
   <canvas
     data-cpu-scene
+    data-view={view}
     class="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-1000 data-ready:opacity-100"
   ></canvas>
 </div>
@@ -46,12 +52,14 @@ const { class: className } = Astro.props;
       for (const canvas of canvases) {
         const handle = await startCpu(canvas, {
           reducedMotion,
+          view: canvas.dataset.view === 'top' ? 'top' : 'showcase',
           accent: themeColorHex('--color-accent', '#a9d5b5'),
           headingFont,
           text: ['Pavel Marek', 'akirathan.dev', 'Senior SW engineer'],
         });
         handles.push(handle);
         canvas.dataset.ready = '';
+        canvas.dispatchEvent(new CustomEvent('cpu:ready', { detail: handle }));
       }
     } catch (error) {
       console.warn('CPU scene disabled:', error);
