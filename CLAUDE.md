@@ -83,6 +83,14 @@ meter in its card on `/skills` by setting `expertise` (integer 1-10) in `skills.
 segments fill with a CSS animation when the card comes into view (an `IntersectionObserver` in
 `skills.astro` sets `data-inview` on the list item; the cards rise on the same signal).
 
+Article pages with two or more `h2` headings get an outline in the left gutter from the `lg`
+breakpoint (`Outline.astro`, drawn by `src/gfx/outline.ts`): an SVG chip with one wire per
+heading, 45° turns. The item of the section in view, or under the pointer, gets `data-on`; CSS
+lights its wire, runs the pulses, and plays the shared `trace-border` (also used by
+`SkillCard.astro`, defined in `global.css`).
+Every `h2` in an article links to itself (permalink, a gray `¶` on hover): the hast plugin
+`src/markdown/headingAnchors.ts`, registered on the `satteri()` processor in `astro.config.mjs`.
+
 `cad/*.fs` is the source of truth for custom features in the owner's Onshape documents.
 FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP server
 (`test_feature`, one API call per run, from a yearly allocation of 2 500), then the owner pastes

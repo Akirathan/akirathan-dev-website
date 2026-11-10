@@ -24,12 +24,13 @@ export async function getStaticPaths() {
 }
 
 const { entry, skill } = Astro.props;
-const { Content } = await render(entry);
+const { Content, headings } = await render(entry);
 const tagline = entry.data.tagline ?? skill.note;
 const jobs = (await usedAtBySkill()).get(skill.slug) ?? [];
 ---
 
 <ArticleLayout
+  headings={headings}
   title={skill.label}
   description={tagline ?? `${skill.label}: notes by Pavel Marek.`}
   eyebrow={skillCategoryOf(skill).title}

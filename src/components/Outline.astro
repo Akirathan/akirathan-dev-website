@@ -1,0 +1,233 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+/**
+ * Article outline for wide screens: a small CPU at the left with one wire to each `h2`. The item
+ * of the section in view (or under the pointer) is active: its wire lights up and pulses run from
+ * the CPU to its connector. Without scripting, it is a plain list of links.
+ */
+interface Props {
+  headings: MarkdownHeading[];
+}
+
+const { headings } = Astro.props;
+---
+
+<nav aria-label="On this page" data-outline class="relative w-full max-w-md">
+  <svg
+    aria-hidden="true"
+    class="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+  ></svg>
+  <ol class="space-y-2 py-2 pl-22">
+    {headings.map((h) => (
+      <li>
+        <a
+          href={`#${h.slug}`}
+          class="trace-border relative block rounded-md border border-transparent px-2.5 py-1 text-sm leading-snug text-muted transition-colors duration-300"
+        >
+          {h.text}
+        </a>
+      </li>
+    ))}
+  </ol>
+</nav>
+
+<style>
+  a:hover,
+  :global([data-on]) > a {
+    border-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+    background-color: color-mix(in oklab, var(--color-ink-soft) 70%, transparent);
+    color: var(--color-paper);
+  }
+
+  /* The pulse dash is 10 of 150 units on a path of 100, so its head reaches the connector at
+     100 / 150 of the period. The connector flashes then. */
+  @keyframes outline-pulse {
+    from {
+      stroke-dashoffset: 10;
+    }
+    to {
+      stroke-dashoffset: -140;
+    }
+  }
+
+  @keyframes outline-flash {
+    0%,
+    65% {
+      fill: var(--color-accent);
+    }
+    68% {
+      fill: white;
+    }
+    90%,
+    100% {
+      fill: var(--color-accent);
+    }
+  }
+
+  [data-outline] :global(.wire) {
+    fill: none;
+    stroke: color-mix(in oklab, var(--color-paper) 18%, transparent);
+    stroke-width: 1.25;
+    transition: stroke 300ms;
+  }
+
+  [data-outline] :global(.pulse) {
+    fill: none;
+    stroke: var(--color-paper);
+    stroke-width: 2;
+    stroke-dasharray: 10 140;
+    opacity: 0;
+  }
+
+  [data-outline] :global(.connector) {
+    fill: color-mix(in oklab, var(--color-paper) 30%, transparent);
+    transition: fill 300ms;
+  }
+
+  [data-outline] :global(.pad) {
+    fill: #d9b25a;
+    opacity: 0.75;
+    transition: fill 300ms;
+  }
+
+  [data-outline] :global([data-on] .wire) {
+    stroke: color-mix(in oklab, var(--color-accent) 80%, transparent);
+  }
+
+  [data-outline] :global([data-on] .connector),
+  [data-outline] :global([data-on] .pad) {
+    fill: var(--color-accent);
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    a:hover::before,
+    :global([data-on]) > a::before {
+      animation: trace 1.4s cubic-bezier(0.45, 0, 0.3, 1);
+    }
+
+    [data-outline] :global([data-on] .pulse) {
+      opacity: 1;
+      animation: outline-pulse 1.6s linear infinite;
+    }
+
+    [data-outline] :global([data-on] .connector) {
+      animation: outline-flash 1.6s linear infinite;
+    }
+  }
+</style>
+
+<script>
+  import { drawOutline } from '../gfx/outline';
+
+  let dispose: (() => void) | null = null;
+
+  document.addEventListener('astro:page-load', () => {
+    const nav = document.querySelector<HTMLElement>('[data-outline]');
+    if (nav) {
+      dispose = startOutline(nav);
+    }
+  });
+
+  document.addEventListener('astro:before-swap', () => {
+    dispose?.();
+    dispose = null;
+  });
+
+  function startOutline(nav: HTMLElement): () => void {
+    const svg = nav.querySelector('svg')!;
+    const items = [...nav.querySelectorAll('li')];
+    const headings = items.map((li) => {
+      const id = decodeURIComponent(li.querySelector('a')!.hash.slice(1));
+      return document.getElementById(id);
+    });
+
+    let scrolled: number | null = null;
+    let hovered: number | null = null;
+
+    const paint = () => {
+      const active = hovered ?? scrolled;
+      items.forEach((li, i) => {
+        li.toggleAttribute('data-on', i === active);
+        if (i === active) {
+          li.querySelector('a')!.setAttribute('aria-current', 'location');
+        } else {
+          li.querySelector('a')!.removeAttribute('aria-current');
+        }
+      });
+      svg
+        .querySelectorAll('[data-item]')
+        .forEach((g, i) => g.toggleAttribute('data-on', i === active));
+    };
+
+    const layout = () => {
+      drawOutline(svg, nav, items);
+      paint();
+    };
+
+    // The section in view is the last one whose heading is above 30 % of the viewport. At the
+    // end of the page the last section counts, even when its heading cannot reach that line.
+    const spy = () => {
+      const line = window.innerHeight * 0.3;
+      let current: number | null = null;
+      headings.forEach((h, i) => {
+        if (h && h.getBoundingClientRect().top <= line) {
+          current = i;
+        }
+      });
+      const atEnd =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atEnd && headings.length > 0) {
+        current = headings.length - 1;
+      }
+      if (current !== scrolled) {
+        scrolled = current;
+        paint();
+      }
+    };
+
+    let frame = 0;
+    const onScroll = () => {
+      if (!frame) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          spy();
+        });
+      }
+    };
+
+    const listeners = items.map((li, i) => {
+      const enter = () => {
+        hovered = i;
+        paint();
+      };
+      const leave = () => {
+        hovered = null;
+        paint();
+      };
+      li.addEventListener('pointerenter', enter);
+      li.addEventListener('pointerleave', leave);
+      li.addEventListener('focusin', enter);
+      li.addEventListener('focusout', leave);
+      return () => {
+        li.removeEventListener('pointerenter', enter);
+        li.removeEventListener('pointerleave', leave);
+        li.removeEventListener('focusin', enter);
+        li.removeEventListener('focusout', leave);
+      };
+    });
+
+    const resize = new ResizeObserver(layout);
+    resize.observe(nav);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    spy();
+
+    return () => {
+      resize.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(frame);
+      listeners.forEach((remove) => remove());
+    };
+  }
+</script>

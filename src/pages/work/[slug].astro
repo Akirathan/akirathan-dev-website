@@ -10,13 +10,14 @@ export async function getStaticPaths() {
 }
 
 const { entry } = Astro.props;
-const { Content } = await render(entry);
+const { Content, headings } = await render(entry);
 const { company, role, period, location, tags, links, summary } = entry.data;
 // Throws on an unknown tag, so a typo fails the build instead of producing a dead link.
 const skills = tags.map(skillByLabel);
 ---
 
 <ArticleLayout
+  headings={headings}
   title={company}
   description={summary[0] ?? `${role} at ${company}`}
   eyebrow={period}
