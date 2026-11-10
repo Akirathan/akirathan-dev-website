@@ -15,10 +15,14 @@ import type { CpuHandle, ScreenTraceEnd } from './cpu';
 import { hooks, selector, states } from '../dom';
 import { pickTraceEnds, routeWires, type Side, type WireTarget } from './boardWires';
 
-/** One pulse period in the CSS of the wires (`global.css`). */
-const PULSE_MS = 1600;
-/** Length of the pulse dash in CSS pixels, the same on every wire. */
-const DASH_PX = 42;
+/**
+ * The pulse on a wire: a dash of `dash` px at `speed` px/s, so short wires get it sooner. After
+ * each run the wire rests for `rest` ms, so that the connector of a short wire does not flash
+ * fast. The connector flashes white when the head arrives: up in `flashIn`, down in `flashOut`.
+ */
+const PULSE = { dash: 42, speed: 410, rest: 600, flashIn: 50, flashOut: 350 };
+/** How long the chip leans toward an idle card when the board has no wires. */
+const IDLE_LEAN_MS = 1600;
 /** Time between two idle pulses. */
 const IDLE_MS = 4200;
 
@@ -61,7 +65,7 @@ export function startWiredBoard(board: HTMLElement): () => void {
     svg.innerHTML = cards
       .map(
         (_, i) =>
-          `<g data-item="${i}"><path class="wire"/><path class="pulse" pathLength="100"/>` +
+          `<g data-item="${i}"><path class="wire"/><path class="pulse"/>` +
           `<rect class="connector" rx="1"/></g>`,
       )
       .join('');
@@ -80,9 +84,6 @@ export function startWiredBoard(board: HTMLElement): () => void {
       const [path, pulse, connector] = groups[i].children;
       path.setAttribute('d', wire.d);
       pulse.setAttribute('d', wire.d);
-      // The path is 100 units long whatever its pixel length, so the dash is set in units.
-      const units = (DASH_PX / (pulse as SVGPathElement).getTotalLength()) * 100;
-      (pulse as SVGPathElement).style.setProperty('--dash', `${Math.min(units, 50)}px`);
       connector.setAttribute('x', `${wire.connector.x}`);
       connector.setAttribute('y', `${wire.connector.y}`);
       connector.setAttribute('width', `${wire.connector.width}`);
@@ -108,14 +109,80 @@ export function startWiredBoard(board: HTMLElement): () => void {
     return { x: t.side === 'left' ? -1 : 1, y: (t.y - cy) / (chip.height / 3) };
   };
 
+  let pulses: Animation[] = [];
+  const stopPulse = () => {
+    pulses.forEach((animation) => animation.cancel());
+    pulses = [];
+  };
+
+  /** Starts the repeating pulse on wire `i`. Returns its period in ms, or 0 without wires. */
+  const startPulse = (i: number): number => {
+    stopPulse();
+    const group = groups[i];
+    if (reducedMotion || !group) {
+      return 0;
+    }
+    const [, pulse, connector] = group.children as unknown as [
+      SVGPathElement,
+      SVGPathElement,
+      SVGRectElement,
+    ];
+    const length = pulse.getTotalLength();
+    if (length === 0) {
+      return 0;
+    }
+    const { dash, speed, rest, flashIn, flashOut } = PULSE;
+    const arrive = (length / speed) * 1000;
+    const travel = ((length + dash) / speed) * 1000;
+    const period = travel + rest;
+    // One dash, and a gap longer than the wire, so that only one dash shows at a time.
+    pulse.style.strokeDasharray = `${dash} ${length + dash}`;
+    pulses.push(
+      pulse.animate(
+        [
+          { strokeDashoffset: dash, offset: 0 },
+          { strokeDashoffset: -length, offset: travel / period },
+          { strokeDashoffset: -length, offset: 1 },
+        ],
+        { duration: period, iterations: Infinity },
+      ),
+    );
+    // Not the computed fill of the connector: its CSS transition to the accent may still run.
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent');
+    pulses.push(
+      connector.animate(
+        [
+          { fill: accent, offset: 0 },
+          { fill: accent, offset: arrive / period },
+          { fill: 'white', offset: (arrive + flashIn) / period },
+          { fill: accent, offset: (arrive + flashIn + flashOut) / period },
+          { fill: accent, offset: 1 },
+        ],
+        { duration: period, iterations: Infinity },
+      ),
+    );
+    return period;
+  };
+
   let hovered: number | null = null;
   let idle: number | null = null;
-  const paint = () => {
+  let lit: number | null = null;
+  /** Lights the active card and its wire. Returns the pulse period of that wire in ms. */
+  const paint = (): number => {
     const active = hovered ?? idle;
     cards.forEach((card, i) => card.toggleAttribute(states.on, i === active));
     groups.forEach((g, i) => g.toggleAttribute(states.on, i === active));
     const target = active === null ? undefined : targets[active];
     cpu?.lean(target ? leanToward(target) : null);
+    if (active === lit) {
+      return 0;
+    }
+    lit = active;
+    if (active === null) {
+      stopPulse();
+      return 0;
+    }
+    return startPulse(active);
   };
 
   let idleIndex = -1;
@@ -128,11 +195,12 @@ export function startWiredBoard(board: HTMLElement): () => void {
         }
         idleIndex = (idleIndex + 1) % cards.length;
         idle = idleIndex;
-        paint();
+        // One run of the pulse. Without wires (narrow screens), only the lean shows.
+        const period = paint();
         idleOff = window.setTimeout(() => {
           idle = null;
           paint();
-        }, PULSE_MS);
+        }, period || IDLE_LEAN_MS);
       }, IDLE_MS);
 
   const listeners = cards.map((card, i) => {
@@ -179,6 +247,7 @@ export function startWiredBoard(board: HTMLElement): () => void {
     resize.disconnect();
     window.clearInterval(idleTimer);
     window.clearTimeout(idleOff);
+    stopPulse();
     listeners.forEach((remove) => remove());
   };
 }

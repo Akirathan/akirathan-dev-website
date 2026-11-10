@@ -111,34 +111,8 @@
   }
 }
 
-/* Wires of a wired board (src/gfx/wiredBoard.ts). Each path is 100 units long (`pathLength`);
-   the head of the pulse runs 150 units per period, so it reaches the connector at 100 / 150 of
-   the period, and the connector flashes then. `--dash` (set by the script, at most 50) keeps
-   the dash the same length on short and long wires. With unitless values the keyframes do not
-   interpolate (they jump), so all values are in px, which `pathLength` scales like units. */
-@keyframes board-pulse {
-  from {
-    stroke-dashoffset: var(--dash, 10px);
-  }
-  to {
-    stroke-dashoffset: calc(var(--dash, 10px) - 150px);
-  }
-}
-
-@keyframes board-flash {
-  0%,
-  65% {
-    fill: var(--color-accent);
-  }
-  68% {
-    fill: white;
-  }
-  90%,
-  100% {
-    fill: var(--color-accent);
-  }
-}
-
+/* Wires of a wired board (src/gfx/wiredBoard.ts). The script animates the pulse and the
+   connector flash, because their timing depends on the length of each wire. */
 [data-board-wires] .wire {
   fill: none;
   stroke: color-mix(in oklab, #d9b25a 35%, transparent);
@@ -150,7 +124,6 @@
   fill: none;
   stroke: var(--color-paper);
   stroke-width: 2;
-  stroke-dasharray: var(--dash, 10px) 150px;
   opacity: 0;
 }
 
@@ -170,11 +143,6 @@
 @media (prefers-reduced-motion: no-preference) {
   [data-board-wires] [data-on] .pulse {
     opacity: 1;
-    animation: board-pulse 1.6s linear infinite;
-  }
-
-  [data-board-wires] [data-on] .connector {
-    animation: board-flash 1.6s linear infinite;
   }
 }
 
