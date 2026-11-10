@@ -61,3 +61,52 @@
     }
   }
 }
+
+/* A signal runs once around the border, like a pulse on a circuit trace. The element needs
+   `position: relative` and a 1px border; start the run with `animation: trace ...` on its
+   `::before`. */
+@property --trace-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes trace {
+  0% {
+    --trace-angle: 0deg;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    --trace-angle: 360deg;
+    opacity: 0;
+  }
+}
+
+@layer components {
+  .trace-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    padding: 2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: conic-gradient(
+      from var(--trace-angle),
+      transparent 0deg 230deg,
+      color-mix(in oklch, var(--color-accent) 50%, transparent) 320deg,
+      var(--color-accent) 350deg,
+      white 360deg
+    );
+    /* Keep only the border ring: the content box is cut out of the full box. */
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+}

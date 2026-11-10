@@ -26,7 +26,7 @@ const morph = (part: string) =>
   class:list={[
     'relative flex h-full min-h-36 scroll-mt-28 flex-col gap-3 rounded-2xl border border-paper/15 bg-ink-soft/90 px-5 py-4 transition-colors',
     'target:border-accent target:bg-linear-to-b target:from-accent/15 target:to-accent/15',
-    article ? 'with-article' : '',
+    article ? 'with-article trace-border' : '',
   ]}
 >
   <h3 class="flex min-h-8 items-center gap-3 text-xl font-semibold text-paper">
@@ -116,51 +116,6 @@ const morph = (part: string) =>
     transition-duration: 300ms;
     box-shadow: 0 20px 60px -30px var(--color-accent);
     border-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
-  }
-
-  /* A signal runs once around the border, like a pulse on a circuit trace. */
-  @property --trace-angle {
-    syntax: '<angle>';
-    inherits: false;
-    initial-value: 0deg;
-  }
-
-  @keyframes trace {
-    0% {
-      --trace-angle: 0deg;
-      opacity: 0;
-    }
-    15% {
-      opacity: 1;
-    }
-    80% {
-      opacity: 1;
-    }
-    100% {
-      --trace-angle: 360deg;
-      opacity: 0;
-    }
-  }
-
-  .with-article::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    padding: 2px;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: conic-gradient(
-      from var(--trace-angle),
-      transparent 0deg 230deg,
-      color-mix(in oklch, var(--color-accent) 50%, transparent) 320deg,
-      var(--color-accent) 350deg,
-      white 360deg
-    );
-    /* Keep only the border ring: the content box is cut out of the full box. */
-    mask:
-      linear-gradient(#000 0 0) content-box exclude,
-      linear-gradient(#000 0 0);
   }
 
   @media (prefers-reduced-motion: no-preference) {
