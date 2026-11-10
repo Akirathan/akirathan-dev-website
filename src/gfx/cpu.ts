@@ -69,9 +69,25 @@ export interface TraceEnd {
   outward: THREE.Vector3;
 }
 
+/** A trace end as it appears on the canvas in the current frame. */
+export interface ScreenTraceEnd {
+  end: TraceEnd;
+  /** CSS pixels from the top-left corner of the canvas. */
+  x: number;
+  y: number;
+  /** `outward` on the screen, unit length. */
+  dx: number;
+  dy: number;
+}
+
+/** Gets one array that is reused for every call: copy what must outlive the call. */
+export type FrameListener = (ends: ScreenTraceEnd[]) => void;
+
 export interface CpuHandle {
   /** The 56 trace ends, for paths that continue outside the chip. */
   traceEnds: TraceEnd[];
+  /** Calls `listener` after each rendered frame and after a resize. Returns the unsubscribe. */
+  onFrameChange(listener: FrameListener): () => void;
   dispose(): void;
 }
 
@@ -453,6 +469,7 @@ function dressModel(
 
 /** Trace ends from the build step, converted to the chip's frame. */
 function traceEndsOf(model: THREE.Group): TraceEnd[] {
+  model.updateMatrix();
   return modelInfo.traceEnds.map(({ side, index, position: [x, y, z] }) => {
     const position = new THREE.Vector3(x, y, z).applyMatrix4(model.matrix);
     const outward = new THREE.Vector3(
@@ -612,6 +629,53 @@ function pose(rig: Rig, pointer: THREE.Vector2, assembled: number, seconds: numb
 }
 
 // ---------------------------------------------------------------------------------------------
+// Trace ends on the screen, for DOM or SVG paths that continue outside the canvas
+// ---------------------------------------------------------------------------------------------
+
+function createProjector(traceEnds: TraceEnd[]) {
+  const screen: ScreenTraceEnd[] = traceEnds.map((end) => ({ end, x: 0, y: 0, dx: 0, dy: 0 }));
+  const base = new THREE.Vector3();
+  const tip = new THREE.Vector3();
+  const listeners = new Set<FrameListener>();
+
+  const notify = (chip: THREE.Object3D, camera: THREE.Camera, canvas: HTMLCanvasElement) => {
+    if (listeners.size === 0) {
+      return;
+    }
+    const { clientWidth: w, clientHeight: h } = canvas;
+    chip.updateMatrixWorld();
+    for (const item of screen) {
+      base.copy(item.end.position).applyMatrix4(chip.matrixWorld).project(camera);
+      tip
+        .copy(item.end.position)
+        .add(item.end.outward)
+        .applyMatrix4(chip.matrixWorld)
+        .project(camera);
+      item.x = ((base.x + 1) / 2) * w;
+      item.y = ((1 - base.y) / 2) * h;
+      // Clip space Y points up, the screen Y points down.
+      const dx = (tip.x - base.x) * w;
+      const dy = (base.y - tip.y) * h;
+      const len = Math.hypot(dx, dy) || 1;
+      item.dx = dx / len;
+      item.dy = dy / len;
+    }
+    for (const listener of listeners) {
+      listener(screen);
+    }
+  };
+
+  const subscribe = (listener: FrameListener) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+
+  return { notify, subscribe, clear: () => listeners.clear() };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------------------------
 
@@ -635,6 +699,9 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
 
   const rig: Rig = { chip, lid: dressed.lid, shadow: shadow.mesh, timeline };
   const pointer = createPointer();
+  const traceEnds = traceEndsOf(model);
+  const projector = createProjector(traceEnds);
+  const notify = () => projector.notify(chip, camera, canvas);
 
   // Sizing.
   const resize = () => {
@@ -643,6 +710,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    notify();
   };
   window.addEventListener('resize', resize);
   resize();
@@ -656,6 +724,7 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
     pointer.update();
     pose(rig, pointer.smoothed, assembled, now / 1000);
     renderer.render(scene, camera);
+    notify();
   };
 
   let running = false;
@@ -683,9 +752,15 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   renderer.render(scene, camera);
 
   return {
-    traceEnds: traceEndsOf(model),
+    traceEnds,
+    onFrameChange(listener) {
+      const unsubscribe = projector.subscribe(listener);
+      notify();
+      return unsubscribe;
+    },
     dispose() {
       stop();
+      projector.clear();
       inView.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('resize', resize);
