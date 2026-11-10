@@ -278,11 +278,13 @@ const columns: [ContactItem[], 'left' | 'right'][] = [
       items.forEach((li, i) => li.toggleAttribute('data-on', i === active));
       groups.forEach((g, i) => g.toggleAttribute('data-on', i === active));
       const target = active === null ? undefined : targets[active];
+      // Full lean toward the side of the card; up or down by how far the card sits from the
+      // middle, so that the top and bottom cards tip the chip clearly in that direction.
       cpu?.lean(
         target
           ? {
-              x: target.x - (canvasOffset.x + canvasSize.width / 2),
-              y: target.y - (canvasOffset.y + canvasSize.height / 2),
+              x: target.side === 'left' ? -1 : 1,
+              y: (target.y - (canvasOffset.y + canvasSize.height / 2)) / (canvasSize.height / 3),
             }
           : null,
       );

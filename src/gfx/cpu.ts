@@ -90,7 +90,7 @@ export interface ScreenTraceEnd {
 /** Gets one array that is reused for every call: copy what must outlive the call. */
 export type FrameListener = (ends: ScreenTraceEnd[]) => void;
 
-/** A screen direction from the centre of the chip, CSS pixel axes (Y down); any length. */
+/** How far to lean on each screen axis, -1..1 (Y down); 1 is the full `TOP_LEAN`. */
 export interface LeanTarget {
   x: number;
   y: number;
@@ -144,10 +144,12 @@ const REST_YAW = 0.6 - Math.PI / 2;
 const TOP_YAW = 0;
 /** Camera height of the top view for a square canvas; the package fills about 70 % of it. */
 const TOP_DISTANCE = 5.4;
-/** Largest pointer tilt of the top view, radians. Small, so that the wire ends stay close. */
-const TOP_TILT = 0.06;
-/** Tilt of the top view toward the active contact card, radians (about 5°). */
-const TOP_LEAN = 0.09;
+/** Largest pointer tilt of the top view, radians (about 6°). */
+const TOP_TILT = 0.1;
+/** Largest tilt of the top view toward the active contact card, per axis, radians (about 10°). */
+const TOP_LEAN = 0.17;
+/** The top view is close to the lid, so its lights are dimmer than in the showcase. */
+const TOP_LIGHT = { key: 1.4, glint: 2.5, environment: 0.3 };
 /** The moving light of the top view: height above the lid, and its reach to the sides. */
 const GLINT = { height: 1.6, drift: 1.1, follow: 1.8 };
 
@@ -244,7 +246,7 @@ function addLights(scene: THREE.Scene, accent: THREE.Color): THREE.DirectionalLi
 
 /** A warm point light close above the chip. Its highlight moves across the brushed lid. */
 function addGlint(scene: THREE.Scene): THREE.PointLight {
-  const glint = new THREE.PointLight(0xfff4e6, 5, 8, 2);
+  const glint = new THREE.PointLight(0xfff4e6, TOP_LIGHT.glint, 8, 2);
   glint.position.set(0, GLINT.height, 0);
   scene.add(glint);
   return glint;
@@ -764,6 +766,10 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
   const key = addLights(scene, accent);
   const glint = view === 'top' ? addGlint(scene) : null;
   const disposeEnvironment = addEnvironment(scene, renderer);
+  if (view === 'top') {
+    key.intensity = TOP_LIGHT.key;
+    scene.environmentIntensity = TOP_LIGHT.environment;
+  }
 
   // Build the chip: the CAD body plus the instanced pins.
   const dressed = dressModel(model, timeline, accent, options);
@@ -846,10 +852,10 @@ export async function startCpu(canvas: HTMLCanvasElement, options: CpuOptions): 
         leanTarget.set(0, 0);
         return;
       }
-      leanTarget.set(toward.x, toward.y);
-      if (leanTarget.lengthSq() > 0) {
-        leanTarget.normalize();
-      }
+      leanTarget.set(
+        THREE.MathUtils.clamp(toward.x, -1, 1),
+        THREE.MathUtils.clamp(toward.y, -1, 1),
+      );
     },
     onFrameChange(listener) {
       const unsubscribe = projector.subscribe(listener);
