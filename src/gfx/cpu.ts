@@ -306,8 +306,12 @@ function drawLidTexture(options: CpuOptions): THREE.CanvasTexture {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (options.text.length === 1) {
+    // As large as fits inside the etched frame, at most 260 px.
+    const word = options.text[0];
     ctx.font = `800 260px ${options.headingFont}`;
-    ctx.fillText(options.text[0], size / 2, size / 2 + 20);
+    const fit = Math.min(260, Math.floor((260 * (size - 280)) / ctx.measureText(word).width));
+    ctx.font = `800 ${fit}px ${options.headingFont}`;
+    ctx.fillText(word, size / 2, size / 2 + fit / 13);
     return lidTexture(canvas);
   }
   const [big, mid, small] = options.text;
