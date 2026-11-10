@@ -110,3 +110,27 @@
       linear-gradient(#000 0 0);
   }
 }
+
+/* `h2` in articles link to themselves (src/markdown/headingAnchors.ts). Unlayered, so it wins
+   over the typography link colours. */
+.heading-anchor {
+  position: relative;
+  color: inherit;
+  text-decoration: none;
+}
+
+.heading-anchor::before {
+  content: '¶' / '';
+  position: absolute;
+  right: 100%;
+  padding-right: 0.35em;
+  font-weight: 400;
+  color: var(--color-muted);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+h2:hover > .heading-anchor::before,
+.heading-anchor:focus-visible::before {
+  opacity: 1;
+}

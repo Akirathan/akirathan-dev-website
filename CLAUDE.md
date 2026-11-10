@@ -88,6 +88,8 @@ breakpoint (`Outline.astro`, drawn by `src/gfx/outline.ts`): an SVG chip with on
 heading, 45° turns. The item of the section in view, or under the pointer, gets `data-on`; CSS
 lights its wire, runs the pulses, and plays the shared `trace-border` (also used by
 `SkillCard.astro`, defined in `global.css`).
+Every `h2` in an article links to itself (permalink, a gray `¶` on hover): the hast plugin
+`src/markdown/headingAnchors.ts`, registered on the `satteri()` processor in `astro.config.mjs`.
 
 `cad/*.fs` is the source of truth for custom features in the owner's Onshape documents.
 FeatureScript runs only on Onshape servers: compile it with the `onshape-fs` MCP server
