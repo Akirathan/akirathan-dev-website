@@ -111,15 +111,17 @@
   }
 }
 
-/* Wires of a wired board (src/gfx/wiredBoard.ts). The pulse dash is 10 of 150 units on a path
-   of 100, so its head reaches the connector at 100 / 150 of the period; the connector flashes
-   then. */
+/* Wires of a wired board (src/gfx/wiredBoard.ts). Each path is 100 units long (`pathLength`);
+   the head of the pulse runs 150 units per period, so it reaches the connector at 100 / 150 of
+   the period, and the connector flashes then. `--dash` (set by the script, at most 50) keeps
+   the dash the same length on short and long wires. With unitless values the keyframes do not
+   interpolate (they jump), so all values are in px, which `pathLength` scales like units. */
 @keyframes board-pulse {
   from {
-    stroke-dashoffset: 10;
+    stroke-dashoffset: var(--dash, 10px);
   }
   to {
-    stroke-dashoffset: -140;
+    stroke-dashoffset: calc(var(--dash, 10px) - 150px);
   }
 }
 
@@ -148,7 +150,7 @@
   fill: none;
   stroke: var(--color-paper);
   stroke-width: 2;
-  stroke-dasharray: 10 140;
+  stroke-dasharray: var(--dash, 10px) 150px;
   opacity: 0;
 }
 

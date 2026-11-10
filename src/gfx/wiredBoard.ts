@@ -17,6 +17,8 @@ import { pickTraceEnds, routeWires, type Side, type WireTarget } from './boardWi
 
 /** One pulse period in the CSS of the wires (`global.css`). */
 const PULSE_MS = 1600;
+/** Length of the pulse dash in CSS pixels, the same on every wire. */
+const DASH_PX = 42;
 /** Time between two idle pulses. */
 const IDLE_MS = 4200;
 
@@ -78,6 +80,9 @@ export function startWiredBoard(board: HTMLElement): () => void {
       const [path, pulse, connector] = groups[i].children;
       path.setAttribute('d', wire.d);
       pulse.setAttribute('d', wire.d);
+      // The path is 100 units long whatever its pixel length, so the dash is set in units.
+      const units = (DASH_PX / (pulse as SVGPathElement).getTotalLength()) * 100;
+      (pulse as SVGPathElement).style.setProperty('--dash', `${Math.min(units, 50)}px`);
       connector.setAttribute('x', `${wire.connector.x}`);
       connector.setAttribute('y', `${wire.connector.y}`);
       connector.setAttribute('width', `${wire.connector.width}`);
