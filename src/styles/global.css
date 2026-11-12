@@ -170,3 +170,88 @@ h2:hover > .heading-anchor::before,
 .heading-anchor:focus-visible::before {
   opacity: 1;
 }
+
+/* Links that leave the site (src/markdown/externalLinks.ts). No underline at rest; on hover a
+   drawn underline appears and a light pulse runs along it, in step with the arrow. Unlayered, so
+   it wins over the typography `hover:underline`. */
+@property --pulse-x {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: -60%;
+}
+
+.external-link {
+  text-decoration: none;
+  background-image:
+    linear-gradient(90deg, transparent, var(--color-paper), transparent),
+    linear-gradient(color-mix(in oklab, currentColor 60%, transparent));
+  background-repeat: no-repeat;
+  background-position:
+    var(--pulse-x) 100%,
+    0 100%;
+  background-size:
+    0 1px,
+    0 1px;
+  box-decoration-break: clone;
+  transition: background-size 250ms ease-out;
+}
+
+.external-link:hover,
+.external-link:focus-visible {
+  text-decoration: none;
+  background-size:
+    35% 1px,
+    100% 1px;
+}
+
+.external-link::after {
+  content: '↗' / ' (external link, opens in a new tab)';
+  display: inline-block;
+  margin-left: 0.1em;
+  font-size: 0.7em;
+  line-height: 1;
+  vertical-align: super;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .external-link:hover,
+  .external-link:focus-visible {
+    animation: external-underline-pulse 1.2s ease-in-out infinite;
+  }
+
+  .external-link:hover::after,
+  .external-link:focus-visible::after {
+    animation: external-arrow-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+/* Reduced motion keeps the underline and drops the moving light. */
+@media (prefers-reduced-motion: reduce) {
+  .external-link:hover,
+  .external-link:focus-visible {
+    background-size:
+      0 1px,
+      100% 1px;
+  }
+}
+
+@keyframes external-underline-pulse {
+  from {
+    --pulse-x: -60%;
+  }
+  to {
+    --pulse-x: 160%;
+  }
+}
+
+@keyframes external-arrow-pulse {
+  0%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+  50% {
+    transform: translate(0.15em, -0.15em) scale(1.15);
+    opacity: 0.6;
+  }
+}

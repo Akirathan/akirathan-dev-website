@@ -7,6 +7,7 @@ import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
 import { satteri } from '@astrojs/markdown-satteri';
 import { headingAnchors } from './src/markdown/headingAnchors';
+import { externalLinks } from './src/markdown/externalLinks';
 
 // https://astro.build/config
 export default defineConfig({
@@ -15,7 +16,7 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   markdown: {
-    processor: satteri({ hastPlugins: [headingAnchors] }),
+    processor: satteri({ hastPlugins: [headingAnchors, externalLinks] }),
   },
   integrations: [sitemap(), mdx()],
 });

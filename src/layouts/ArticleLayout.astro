@@ -3,6 +3,7 @@ import { Image } from 'astro:assets';
 import type { MarkdownHeading } from 'astro';
 import BaseLayout from './BaseLayout.astro';
 import Outline from '../components/Outline.astro';
+import { REFERENCES_ID } from '../markdown/externalLinks';
 
 interface Props {
   title: string;
@@ -30,7 +31,7 @@ const {
   transitionName,
   headings = [],
 } = Astro.props;
-const sections = headings.filter((h) => h.depth === 2);
+const sections = headings.filter((h) => h.depth === 2 && h.slug !== REFERENCES_ID);
 const hasOutline = sections.length >= 2;
 const morph = (part: string) =>
   transitionName ? `view-transition-name: ${transitionName}-${part}` : undefined;
@@ -82,7 +83,7 @@ const morph = (part: string) =>
         {meta && <p class="mt-3 text-muted">{meta}</p>}
         <slot name="header" />
       </header>
-      <div class="prose prose-invert prose-headings:font-heading prose-headings:tracking-tight prose-a:text-accent prose-a:no-underline hover:prose-a:underline prose-blockquote:border-accent-dim prose-blockquote:text-muted prose-code:before:content-none prose-code:after:content-none max-w-none">
+      <div class="prose prose-invert prose-headings:font-heading prose-headings:tracking-tight prose-a:text-accent prose-a:no-underline prose-a:hover:underline prose-blockquote:border-accent-dim prose-blockquote:text-muted prose-code:before:content-none prose-code:after:content-none max-w-none">
         <slot />
       </div>
     </article>
