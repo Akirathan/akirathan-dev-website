@@ -173,11 +173,31 @@ h2:hover > .heading-anchor::before,
 
 /* Links that leave the site (src/markdown/externalLinks.ts). */
 .external-link::after {
-  content: '↗' / ' (external link)';
+  content: '↗' / ' (external link, opens in a new tab)';
   display: inline-block;
   margin-left: 0.1em;
   font-size: 0.7em;
   line-height: 1;
   vertical-align: super;
   text-decoration: none;
+}
+
+/* The arrow pulses away from the text while the link is hovered. */
+@media (prefers-reduced-motion: no-preference) {
+  .external-link:hover::after,
+  .external-link:focus-visible::after {
+    animation: external-pulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes external-pulse {
+  0%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+  50% {
+    transform: translate(0.15em, -0.15em) scale(1.15);
+    opacity: 0.6;
+  }
 }

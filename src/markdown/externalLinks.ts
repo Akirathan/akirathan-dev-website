@@ -6,6 +6,8 @@ export const REFERENCES_ID = 'references';
 
 const SITE_HOST = 'akirathan.dev';
 
+const NEW_TAB = { target: '_blank', rel: 'noreferrer' };
+
 interface Reference {
   url: string;
   name: string;
@@ -40,11 +42,9 @@ function referencesSection(references: Reference[]): Element {
     el('li', 'my-0 pl-1', [
       el(
         'a',
-        'external-link text-muted underline-offset-2 hover:text-paper hover:underline',
+        'external-link text-muted no-underline underline-offset-2 hover:text-paper hover:underline',
         [text(name)],
-        {
-          href: url,
-        },
+        { href: url, ...NEW_TAB },
       ),
       el('span', 'block truncate text-xs text-muted/70', [text(url.replace(/^https?:\/\//, ''))]),
     ]),
@@ -81,6 +81,8 @@ export const externalLinks: HastPluginEntry = () => {
         const existing = node.properties?.className;
         const classes = Array.isArray(existing) ? existing : [];
         ctx.setProperty(node, 'className', [...classes, 'external-link']);
+        ctx.setProperty(node, 'target', NEW_TAB.target);
+        ctx.setProperty(node, 'rel', NEW_TAB.rel);
         if (!references.has(url.href)) {
           const name = ctx.textContent(node).trim() || url.hostname;
           references.set(url.href, { url: url.href, name });
