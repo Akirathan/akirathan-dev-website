@@ -9,6 +9,14 @@ summary:
 draft: true
 ---
 
+import PhotoSwipe from "@/components/mdx/PhotoSwipe.astro";
+import verticalWallGrid from "@/assets/hobbies/vertical-wall-grid.jpg";
+import verticalWallBuilt1 from "@/assets/hobbies/vertical-wall-built-1.jpg";
+import verticalWallBuilt2 from "@/assets/hobbies/vertical-wall-built-2.jpg";
+import asianWallGrid from "@/assets/hobbies/asian-wall-grid.jpg";
+import asianWallBuilt1 from "@/assets/hobbies/asian-wall-built-1.jpg";
+import asianWallBuilt2 from "@/assets/hobbies/asian-wall-built-2.jpg";
+
 > Draft. Pavel will expand this page.
 
 ## Dog breeding station
@@ -22,3 +30,25 @@ A hobby that became a business: see [Lístky radosti](/work/listky-radosti).
 ## Making things
 
 A steel grid for a vertical grow system, 3D printing, and laser engraving.
+
+A little bit of manual work in [Lístky radosti](/work/listky-radosti):
+
+Vertical wall:
+<PhotoSwipe
+  images={[verticalWallGrid, verticalWallBuilt1, verticalWallBuilt2]}
+  alts={[
+    "Vertical wall grid",
+    "Vertical wall almost built",
+    "Vertical wall built"
+  ]}
+/>
+
+Asian wall:
+<PhotoSwipe
+  images={[asianWallGrid, asianWallBuilt1, asianWallBuilt2]}
+  alts={[
+    "Asian wall grid",
+    "Asian wall almost built",
+    "Asian wall built"
+  ]}
+/>
