@@ -3,7 +3,7 @@ title: Hobbies
 tagline: Life away from the keyboard.
 order: 7
 summary:
-  - I run a dog breeding station.
+  - I run a registered dog kennel.
   - Plants, obviously. Enough to open a showroom.
   - 'Making things by hand: steel, 3D printing, laser engraving.'
 draft: true
@@ -21,79 +21,11 @@ import dog01 from "@/assets/hobbies/dog-01.jpg";
 import dog02 from "@/assets/hobbies/dog-02.jpg";
 import dog03 from "@/assets/hobbies/dog-03.jpg";
 
-## Making things
-
-As somebody, who almost couldn't use a screwdriver, I would have never believed, that I would build a steel structure with the capacity to hold a ton of material.
-
-In the beginning, it was just something that needed to be done for [Lístky radosti](/work/listky-radosti) and I couldn't find a contractor quick enough.
-At the end, it turned out to be my hobby which I hope I will continue to do in my spare time in the future.
-
-Many broken drills, injured fingers, steel shavings, I have built this steel grid with load capacity of almost a ton:
-<PhotoSwipe
-  images={[verticalWallGrid, verticalWallBuilt1, verticalWallBuilt2]}
-  alts={[
-    "Vertical wall grid",
-    "Vertical wall almost built",
-    "Vertical wall built"
-  ]}
-/>
-
-Also another wall, this time with much simpler structure and not such a big load capacity:
-<PhotoSwipe
-  images={[asianWallGrid, asianWallBuilt1, asianWallBuilt2]}
-  alts={[
-    "Asian wall grid",
-    "Asian wall almost built",
-    "Asian wall built"
-  ]}
-/>
-
-### Laser engraving
-
-I have bought this wonderful beast: [xTool P2S](???).
-TODO: Photo
-
-The original idea was to make some custom business-related engraved/cut wood or acrylic sheets like boards with room names in our showroom or custom plant supports.
-To my surprise, its operation is pretty simple: as an input, it takes basically jsut an SVG file with some custom metadata like strength of the laser for each path.
-The art is in getting customized to all possible materials and see how they react to the laser.
-
-### 3D printing
-
-I started with [Prusa Core One L](??) and later bought [BambuLab H2S](???) as well.
-To my surprise, controlling CO2 [laser engraver](???) is much simpler than controlling an average 3D printer.
-Every 3D printing enthusiast will sooner or later realize that in order to unlock the potential, they have to create their own 3D models.
-With all the AI tools around today, it should be pretty easy, right?
-Not quite, unfortunately.
-Although those various AI tools can certainly help, they still lack a lot of features.
-One of my first runs out of tokens was when I was trying to convince Claude to make some 3D model *watertight* (manifold).
-At the end, I had to do that myself manually in [Blender](???).
-Nowadays, it seems that [Blender with MCP](???) is the way to go for many artists and enthusiasts.
-
-When it comes to 3D models and their customizations, I think that I have tried just about every possible tool that offers a free trial.
-Starting with the [CAD](???) software, I have used [Autodesk Fusion](???) for some time.
-When I start using Fusion, they were just fiddling with cloud-file storing.
-Running into incredibly long UI freezes.
-I believe they were syncing the file with cloud on the main thread.
-It took few version upgrades until they solved the issue, but it got me stop using the software.
-I have ended up with [OnShape](???).
-
-My workflow:
-Depends on complexity of whatever you are trying to create.
-If it is made of simple geometries, then you can create the model entirely just in a [CAD](???) software, feed it into the 3D slicer, and send it to the printer.
-If you are doing something more complex, or you wish to modify some already existing 3D model, things get more complicated.
-Usually, existing 3D models publish only `STL` files, no CAD files.
-So you can open them only in Blender and other mesh-editing software.
-
-Claude, for example, is great with generating quite complex geometries from scripts.
-It, however, lacks when trying to mimic some natural textures.
-For that, you have to use other AI tool based on image diffusion models, like [MeshyAI](???).
-
-
 ## Dogs
 
 I have two Russian Tsvetnaya Bolonka dogs.
-If you don't know what the breed is - it is a similar living cute fluffy ball just like a bichon.
-I am also a registered kennel - currently expecting our second litter.
+Never heard of the breed? Think of a bichon: a cute, living ball of fluff.
+I also run a registered kennel, and we are expecting our second litter right now.
 
 <PhotoSwipe
   images={[coco2, dog01, dog02, dog03]}
@@ -106,4 +38,77 @@ I am also a registered kennel - currently expecting our second litter.
   ]}
 />
 
-If you want to get into a cuteness overflow state, visit our official website [Pikaro](https://pikaro.cz).
+If you want to get into a cuteness overflow state, visit our official website, [Pikaro](https://pikaro.cz).
+
+## Making things
+
+I used to be somebody who could barely use a screwdriver.
+I would never have believed that one day I would build a steel structure that holds almost a ton.
+
+It started as something that simply had to be done for [Lístky radosti](/work/listky-radosti), and I could not find a contractor quickly enough.
+In the end, it turned into a hobby, and I hope to keep doing it in my spare time.
+
+### Steel
+
+Many broken drills, injured fingers and steel shavings later, I had built this steel grid with a load capacity of almost a ton:
+
+<PhotoSwipe
+  images={[verticalWallGrid, verticalWallBuilt1, verticalWallBuilt2]}
+  alts={[
+    "Vertical wall grid",
+    "Vertical wall almost built",
+    "Vertical wall built"
+  ]}
+/>
+
+Then another wall, this time with a much simpler structure and a smaller load capacity:
+
+<PhotoSwipe
+  images={[asianWallGrid, asianWallBuilt1, asianWallBuilt2]}
+  alts={[
+    "Asian wall grid",
+    "Asian wall almost built",
+    "Asian wall built"
+  ]}
+/>
+
+### Laser engraving
+
+I bought this wonderful beast: the [xTool P2S](???).
+TODO: Photo
+
+The original idea was to make engraved or cut pieces of wood and acrylic for the business: signs with room names for our showroom, or custom plant supports.
+
+To my surprise, it is pretty simple to operate.
+As input, it takes basically just an SVG file with some custom metadata, such as the laser strength for each path.
+Controlling a CO2 [laser engraver](???) is much simpler than controlling an average 3D printer.
+The art is in getting to know all the possible materials and how each of them reacts to the laser.
+
+### 3D printing
+
+I started with a [Prusa Core One L](??) and later bought a [Bambu Lab H2S](???) as well.
+
+Every 3D printing enthusiast realizes sooner or later that to unlock the full potential, they have to create their own 3D models.
+With all the AI tools around today, that should be pretty easy, right?
+Not quite, unfortunately.
+The AI tools can certainly help, but they still lack a lot of features.
+One of the first times I ran out of tokens was when I tried to convince Claude to make a 3D model _watertight_ (manifold).
+In the end, I had to fix it myself, manually, in [Blender](???).
+
+Claude, for example, is great at generating quite complex geometry from scripts.
+However, it falls short when it has to mimic natural textures.
+For those, you have to use a different AI tool, one based on image diffusion models, such as [MeshyAI](???).
+Nowadays, [Blender with MCP](???) seems to be the way to go for many artists and enthusiasts.
+
+When it comes to creating and customizing 3D models, I think I have tried just about every tool that offers a free trial.
+On the [CAD](???) side, I used [Autodesk Fusion](???) for some time.
+When I started with Fusion, they were in the middle of moving file storage to the cloud, and the UI kept freezing for incredibly long periods.
+I believe they synced the files with the cloud on the main thread.
+It took a few version upgrades until they fixed the issue, but by then it had made me stop using the software.
+I ended up with [Onshape](???).
+
+My workflow depends on how complex the thing I want to create is:
+
+- **Simple geometry:** I create the whole model in [CAD](???) software, feed it into the 3D slicer, and send it to the printer.
+- **Something more complex, or a change to an existing model:** things get more complicated.
+  Existing 3D models are usually published only as `STL` files, with no CAD files, so you can open them only in Blender or other mesh-editing software.
