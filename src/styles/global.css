@@ -12,6 +12,7 @@
   --color-ink-soft: oklch(0.22 0.018 260);
   --color-paper: oklch(0.94 0.01 90);
   --color-muted: oklch(0.72 0.012 260);
+  --color-subtle: oklch(0.68 0.03 200);
   --color-accent: oklch(0.8 0.09 150);
   --color-accent-dim: oklch(0.6 0.07 150);
 

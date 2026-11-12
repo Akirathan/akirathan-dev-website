@@ -1,8 +1,37 @@
 ---
+import github from '@tabler/icons/outline/brand-github.svg?raw';
+
 const year = new Date().getFullYear();
+const repo = 'Akirathan/akirathan-dev-website';
+const link = 'transition-colors duration-300 hover:text-paper focus-visible:text-paper';
 ---
 
-<footer class="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-10 text-sm text-muted sm:px-6">
-  <p>© {year} Pavel Marek</p>
-  <p>Brno, Czechia</p>
+<footer class="border-t border-white/10 bg-ink/40 text-sm text-subtle backdrop-blur-md">
+  <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-10 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
+    <p>© {year} Pavel Marek</p>
+    <nav
+      aria-label="Footer"
+      class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6"
+    >
+      <a href="/about" class={link}>
+        About
+      </a>
+      <a href="/about#how-it-was-made" class={link}>
+        Written by me, implemented in cooperation with Claude
+      </a>
+      <a
+        href={`https://github.com/${repo}`}
+        rel="noopener"
+        target="_blank"
+        class:list={['inline-flex items-center gap-2', link]}
+      >
+        <span
+          aria-hidden="true"
+          class="size-4 shrink-0 [&>svg]:size-full [&>svg]:stroke-[1.75]"
+          set:html={github}
+        />
+        {repo}
+      </a>
+    </nav>
+  </div>
 </footer>
