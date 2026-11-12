@@ -1,0 +1,17 @@
+---
+import ArticleLayout from '@/layouts/ArticleLayout.astro';
+import { Content, frontmatter, getHeadings } from '@/content/about.mdx';
+
+const { title, summary } = frontmatter as { title: string; summary: string[] };
+---
+
+<ArticleLayout
+  headings={getHeadings()}
+  title={title}
+  description={summary.join(' ')}
+  eyebrow="This website"
+  backHref="/"
+  backLabel="Back"
+>
+  <Content />
+</ArticleLayout>
