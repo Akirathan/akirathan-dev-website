@@ -73,10 +73,10 @@ const repoLabel = 'Source code';
     transform-origin: left;
   }
 
-  /* The pulse of Outline.astro: a dash of 10 % runs to 150 %, so it is out of sight for the last
-     third of the period. */
+  /* The pulse of Outline.astro, with a fixed dash length so that short labels get a visible
+     dash. The run goes on past the end, so the dash is out of sight for part of the period. */
   @property --footer-pulse {
-    syntax: '<percentage>';
+    syntax: '<length-percentage>';
     inherits: false;
     initial-value: 0%;
   }
@@ -86,7 +86,7 @@ const repoLabel = 'Source code';
       --footer-pulse: 0%;
     }
     to {
-      --footer-pulse: 150%;
+      --footer-pulse: calc(150% + 1rem);
     }
   }
 
@@ -98,8 +98,8 @@ const repoLabel = 'Source code';
     height: 2px;
     background: linear-gradient(
       90deg,
-      transparent calc(var(--footer-pulse) - 10%),
-      var(--color-paper) calc(var(--footer-pulse) - 10%),
+      transparent calc(var(--footer-pulse) - 1rem),
+      var(--color-paper) calc(var(--footer-pulse) - 1rem),
       var(--color-paper) var(--footer-pulse),
       transparent var(--footer-pulse)
     );
