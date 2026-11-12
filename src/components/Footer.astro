@@ -48,11 +48,11 @@ const updated = lastCommit?.date.toLocaleDateString('en-GB', {
         <a href="/about#how-it-was-made">Written by me, built with Claude</a>
       </p>
       {lastCommit && (
-        <p class="text-xs">
-          Updated <time datetime={lastCommit.date.toISOString()}>{updated}</time>
-          <span aria-hidden="true" class="mx-1">
-            ·
+        <p class="flex justify-center gap-2 text-xs">
+          <span>
+            Updated <time datetime={lastCommit.date.toISOString()}>{updated}</time>
           </span>
+          <span aria-hidden="true">·</span>
           <a
             href={`https://github.com/${repo}/commit/${lastCommit.hash}`}
             rel="noopener"
