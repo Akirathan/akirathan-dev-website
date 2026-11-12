@@ -3,18 +3,22 @@ import github from '@tabler/icons/outline/brand-github.svg?raw';
 
 const year = new Date().getFullYear();
 const repo = 'Akirathan/akirathan-dev-website';
+const repoLabel = 'Source code';
 const link = 'transition-colors duration-300 hover:text-paper focus-visible:text-paper';
 ---
 
 <footer class="border-t border-white/10 bg-ink/40 text-sm text-subtle backdrop-blur-md">
-  <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-10 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
+  <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-10 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-x-8">
     <p>© {year} Pavel Marek</p>
     <nav
       aria-label="Footer"
-      class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6"
+      class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 lg:justify-center"
     >
       <a href="/about" class={link}>
         About
+      </a>
+      <a href="/contact" class={link}>
+        Contact
       </a>
       <a href="/about#how-it-was-made" class={link}>
         Written by me, implemented in cooperation with Claude
@@ -30,7 +34,7 @@ const link = 'transition-colors duration-300 hover:text-paper focus-visible:text
           class="size-4 shrink-0 [&>svg]:size-full [&>svg]:stroke-[1.75]"
           set:html={github}
         />
-        {repo}
+        {repoLabel}
       </a>
     </nav>
   </div>
