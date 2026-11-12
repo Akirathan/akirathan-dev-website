@@ -12,8 +12,10 @@ import {
   mix,
   mx_noise_float,
   select,
+  max,
   sin,
   smoothstep,
+  step,
   texture,
   uniform,
   uv,
@@ -25,8 +27,6 @@ import {
 export interface PhotoSwipeOptions {
   /** Image URLs, at least two. */
   faces: string[];
-  /** Width / height of the photos. */
-  aspect: number;
   /** Advance by itself when idle. Off under reduced motion. */
   autoAdvance: boolean;
   /** Called after a transition completes, with the new index. */
@@ -77,12 +77,14 @@ export async function startPhotoSwipe(
   const uProgress = uniform(0); // 0: the current photo, 1: the next photo
   const uDirection = uniform(1); // +1: wipe left to right, -1: right to left
   const uTime = uniform(0);
-  const uCover = uniform(new THREE.Vector2(1, 1)); // uv scale for a cover fit
+  // uv scale that fits each photo whole into the canvas, by its own aspect
+  const uFitFrom = uniform(new THREE.Vector2(1, 1));
+  const uFitTo = uniform(new THREE.Vector2(1, 1));
   const fromTexture = texture(textures[0]!);
   const toTexture = texture(textures[1]!);
 
   // The shader.
-  const base = uv().sub(0.5).mul(uCover).add(0.5);
+  const base = uv();
   const wave = sin(uProgress.mul(PI)); // 0 at both ends, 1 in the middle
   const noise = mx_noise_float(vec3(base.mul(3.2), uTime.mul(0.12))); // about -1..1
   const along = select(uDirection.greaterThan(0), base.x, base.x.oneMinus());
@@ -102,16 +104,25 @@ export async function startPhotoSwipe(
   const fromUv = zoom(uProgress, 1.0, 1.07).add(displacement.mul(reveal));
   const toUv = zoom(uProgress, 1.09, 1.0).sub(displacement.mul(reveal.oneMinus()));
 
-  const fromColor = fromTexture.sample(fromUv);
-  const toColor = toTexture.sample(toUv);
+  const fit = (p: typeof fromUv, scale: typeof uFitFrom) => p.sub(0.5).mul(scale).add(0.5);
+  const inside = (p: typeof fromUv) =>
+    step(0, p.x).mul(step(p.x, 1)).mul(step(0, p.y)).mul(step(p.y, 1));
+  const fromFit = fit(fromUv, uFitFrom);
+  const toFit = fit(toUv, uFitTo);
+  const fromMask = inside(fromFit);
+  const toMask = inside(toFit);
+  const fromColor = fromTexture.sample(fromFit).rgb.mul(fromMask);
+  const toColor = toTexture.sample(toFit).rgb.mul(toMask);
+  const alpha = mix(fromMask, toMask, reveal);
   // A soft shadow along the front gives the wipe a liquid thickness.
   const front = smoothstep(0.5, 0.0, abs(reveal.sub(0.5)))
     .mul(wave)
     .mul(0.35);
-  const color = mix(fromColor, toColor, reveal).rgb.mul(front.oneMinus());
+  const color = mix(fromColor, toColor, reveal).div(max(alpha, 0.001)).mul(front.oneMinus());
 
-  const material = new THREE.MeshBasicNodeMaterial();
+  const material = new THREE.MeshBasicNodeMaterial({ transparent: true });
   material.colorNode = color;
+  material.opacityNode = alpha;
 
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -131,16 +142,33 @@ export async function startPhotoSwipe(
 
   const wrap = (i: number) => ((i % count) + count) % count;
 
+  const fitScale = (out: THREE.Vector2, photo: THREE.Texture) => {
+    const { clientWidth: w, clientHeight: h } = canvas;
+    const image = photo.image as { width: number; height: number };
+    if (w === 0 || h === 0 || image.height === 0) {
+      return;
+    }
+    const canvasAspect = w / h;
+    const photoAspect = image.width / image.height;
+    if (canvasAspect > photoAspect) {
+      out.set(canvasAspect / photoAspect, 1);
+    } else {
+      out.set(1, photoAspect / canvasAspect);
+    }
+  };
+
   const setTarget = (i: number, dir: number) => {
     target = wrap(i);
     direction = dir;
     toTexture.value = textures[target]!;
+    fitScale(uFitTo.value, textures[target]!);
     uDirection.value = dir;
   };
 
   const finish = () => {
     index = target;
     fromTexture.value = textures[index]!;
+    fitScale(uFitFrom.value, textures[index]!);
     progress = 0;
     uProgress.value = 0;
     lastChange = performance.now();
@@ -208,12 +236,8 @@ export async function startPhotoSwipe(
     const { clientWidth: w, clientHeight: h } = canvas;
     if (w === 0 || h === 0) return;
     renderer.setSize(w, h, false);
-    const canvasAspect = w / h;
-    if (canvasAspect > options.aspect) {
-      uCover.value.set(1, options.aspect / canvasAspect);
-    } else {
-      uCover.value.set(canvasAspect / options.aspect, 1);
-    }
+    fitScale(uFitFrom.value, textures[index]!);
+    fitScale(uFitTo.value, textures[target]!);
   };
   resize();
 
