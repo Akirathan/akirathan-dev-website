@@ -25,7 +25,7 @@ import dog03 from "@/assets/hobbies/dog-03.jpg";
 
 I have two Russian Tsvetnaya Bolonka dogs.
 Never heard of the breed? Think of a bichon: a cute, living ball of fluff.
-I also run a registered kennel, and we are expecting our second litter right now.
+I also run a registered kennel, and we are expecting our second litter soon.
 
 <PhotoSwipe
   images={[coco2, dog01, dog02, dog03]}
@@ -80,11 +80,14 @@ TODO: Photo
 The original idea was to make engraved or cut pieces of wood and acrylic for the business: signs with room names for our showroom, or custom plant supports.
 
 To my surprise, it is pretty simple to operate.
-As input, it takes basically just an SVG file with some custom metadata, such as the laser strength for each path.
+As input, it takes basically just an SVG file with some custom metadata, such as the laser strength and speed for each path.
 Controlling a CO2 [laser engraver](???) is much simpler than controlling an average 3D printer.
 The art is in getting to know all the possible materials and how each of them reacts to the laser.
 
 ### 3D printing
+
+Disclaimer: I am no 3D printing specialist. The following paragraphs go through my early experiences with 3D printing.
+TL;DR; It is more complicated than I anticipated.
 
 I started with a [Prusa Core One L](??) and later bought a [Bambu Lab H2S](???) as well.
 
@@ -99,16 +102,36 @@ Claude, for example, is great at generating quite complex geometry from scripts.
 However, it falls short when it has to mimic natural textures.
 For those, you have to use a different AI tool, one based on image diffusion models, such as [MeshyAI](???).
 Nowadays, [Blender with MCP](???) seems to be the way to go for many artists and enthusiasts.
+I have not tried it yet though.
 
 When it comes to creating and customizing 3D models, I think I have tried just about every tool that offers a free trial.
+
+#### CAD
+
 On the [CAD](???) side, I used [Autodesk Fusion](???) for some time.
 When I started with Fusion, they were in the middle of moving file storage to the cloud, and the UI kept freezing for incredibly long periods.
 I believe they synced the files with the cloud on the main thread.
 It took a few version upgrades until they fixed the issue, but by then it had made me stop using the software.
-I ended up with [Onshape](???).
+
+[Shapr3d](???) seemed nice, but it lacks some features, especially when creating [sketches](???).
+Its free plan allows only 2 projects which is too limiting as opposed to Fusion.
+
+[FreeCAD](???) is obviously close to me, since I generally like and try to encourage open-source projects.
+With its [Python bindings](???) it offers a comfortable way to let your AI agent fiddle with models.
+The downside is its enormous complexity and occasional crashes.
+
+I ended up with [OnShape](???).
+Browser-only CAD software that is, surprisingly, the fastest from all the other variants that I have tried.
+On a free plan, you can create as many models as you want, they just stay publicly reachable.
+
+#### Mesh editing
+
+[Blender](???) is a very good, capable, open-source variant.
+For generating models, I would recommend [MeshyAI](???), but if you want your model to be truly printable, it may be inevitable to do some final modifications in Blender manually.
+
 
 My workflow depends on how complex the thing I want to create is:
 
-- **Simple geometry:** I create the whole model in [CAD](???) software, feed it into the 3D slicer, and send it to the printer.
+- **Simple geometry:** I create the whole model in [OnShape CAD](???) software with Claude helping me with some features via the MCP server, feed it into the 3D slicer, and send it to the printer.
 - **Something more complex, or a change to an existing model:** things get more complicated.
   Existing 3D models are usually published only as `STL` files, with no CAD files, so you can open them only in Blender or other mesh-editing software.
