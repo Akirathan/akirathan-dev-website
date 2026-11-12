@@ -3,9 +3,9 @@ title: Hobbies
 tagline: Life away from the keyboard.
 order: 7
 summary:
-  - I run a registered dog kennel.
   - Plants, obviously. Enough to open a showroom.
-  - 'Making things by hand: steel, 3D printing, laser engraving.'
+  - 'Making things by hand: steel, laser engraving, 3D printing.'
+  - I run a registered dog kennel.
 draft: true
 ---
 
@@ -24,8 +24,17 @@ import dog02 from "@/assets/hobbies/dog-02.jpg";
 import dog03 from "@/assets/hobbies/dog-03.jpg";
 import xtoolP2s from "@/assets/hobbies/xtool-p2s.jpg";
 import koreny from "@/assets/hobbies/koreny-vyziva.jpg";
+import prusa from "@/assets/hobbies/prusa.jpg";
+
+## Plants
+
+A hobby that became a business: see [Lístky radosti](/work/listky-radosti).
 
 ## Making things
+
+Making things by hand: steel, laser engraving and 3D printing.
+
+### Steel
 
 I used to be somebody who could barely use a screwdriver.
 I would never have believed that one day I would build a steel structure that holds almost a ton.
@@ -33,9 +42,7 @@ I would never have believed that one day I would build a steel structure that ho
 It started as something that simply had to be done for [Lístky radosti](/work/listky-radosti), and I could not find a contractor quickly enough.
 In the end, it turned into a hobby, and I hope to keep doing it in my spare time.
 
-### Steel
-
-Many broken drills, injured fingers and steel shavings later, I had built this steel grid with a load capacity of almost a ton:
+Many broken drills, injured fingers and steel shavings later, I had built this steel grid:
 
 <PhotoSwipe
   images={[verticalWallGrid, verticalWallBuilt1, verticalWallBuilt2]}
@@ -84,13 +91,14 @@ I am no 3D printing specialist. The following paragraphs go through my early exp
 
 I started with a [Prusa Core One L](https://www.prusa3d.com/product/prusa-core-one-l/) and later bought a [Bambu Lab H2S](https://bambulab.com/en-us/h2s) as well.
 
+<Photo image={prusa} alt="The Prusa Core One L 3D printer" />
+
 Every 3D printing enthusiast realizes sooner or later that to unlock the full potential, they have to create their own 3D models.
 With all the AI tools around today, that should be pretty easy, right?
 Not quite, unfortunately.
 The AI tools can certainly help, but they still lack a lot of features.
 One of the first times I ran out of tokens was when I tried to convince Claude to make a 3D model _watertight_ (manifold).
 In the end, I had to fix it myself, manually, in Blender.
-Claude, for example, is great at generating quite complex geometry from scripts.
 
 When it comes to creating and customizing 3D models, I think I have tried just about every tool that offers a free trial.
 
@@ -114,10 +122,10 @@ On a free plan, you can create as many models as you want; they are just public.
 #### Mesh editing
 
 [Blender](https://www.blender.org/) is a very capable open-source option.
-Nowadays, [ahujasid/mcp-for-blender](https://github.com/ahujasid/mcp-for-blender) seems to be the way to go for many artists and enthusiasts.
+Nowadays, [Blender MCP](https://github.com/ahujasid/mcp-for-blender) seems to be the way to go for many artists and enthusiasts.
 I have not tried it yet though.
 
-Claude falls short when it has to mimic natural textures.
+Claude is great at generating quite complex geometry from scripts, but it falls short when it has to mimic natural textures.
 For those, you have to use a different AI tool, one based on image diffusion models.
 For generating models, I would recommend [MeshyAI](https://www.meshy.ai/), but if you want your model to be truly printable, it may be inevitable to do some final modifications in Blender manually.
 
