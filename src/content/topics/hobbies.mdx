@@ -10,6 +10,7 @@ draft: true
 ---
 
 import PhotoSwipe from "@/components/mdx/PhotoSwipe.astro";
+import Photo from "@/components/mdx/Photo.astro";
 import verticalWallGrid from "@/assets/hobbies/vertical-wall-grid.jpg";
 import verticalWallBuilt1 from "@/assets/hobbies/vertical-wall-built-1.jpg";
 import verticalWallBuilt2 from "@/assets/hobbies/vertical-wall-built-2.jpg";
@@ -20,6 +21,8 @@ import coco2 from "@/assets/hobbies/coco-2.jpg";
 import dog01 from "@/assets/hobbies/dog-01.jpg";
 import dog02 from "@/assets/hobbies/dog-02.jpg";
 import dog03 from "@/assets/hobbies/dog-03.jpg";
+import xtoolP2s from "@/assets/hobbies/xtool-p2s.jpg";
+import koreny from "@/assets/hobbies/koreny-vyziva.jpg";
 
 ## Dogs
 
@@ -75,7 +78,8 @@ Then another wall, this time with a much simpler structure and a smaller load ca
 ### Laser engraving
 
 I bought this wonderful beast: the [xTool P2S](???).
-TODO: Photo
+
+<Photo image={xtoolP2s} alt="The xTool P2S laser engraver" />
 
 The original idea was to make engraved or cut pieces of wood and acrylic for the business: signs with room names for our showroom, or custom plant supports.
 
@@ -83,6 +87,10 @@ To my surprise, it is pretty simple to operate.
 As input, it takes basically just an SVG file with some custom metadata, such as the laser strength and speed for each path.
 Controlling a CO2 [laser engraver](???) is much simpler than controlling an average 3D printer.
 The art is in getting to know all the possible materials and how each of them reacts to the laser.
+
+An example of my playing with engraving:
+
+<Photo image={koreny} alt="Laser-cut lettering and engraved wooden signs on a showroom wall" />
 
 ### 3D printing
 
