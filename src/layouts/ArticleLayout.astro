@@ -3,6 +3,7 @@ import { Image } from 'astro:assets';
 import type { MarkdownHeading } from 'astro';
 import BaseLayout from './BaseLayout.astro';
 import Outline from '../components/Outline.astro';
+import { REFERENCES_ID } from '../markdown/externalLinks';
 
 interface Props {
   title: string;
@@ -30,7 +31,7 @@ const {
   transitionName,
   headings = [],
 } = Astro.props;
-const sections = headings.filter((h) => h.depth === 2);
+const sections = headings.filter((h) => h.depth === 2 && h.slug !== REFERENCES_ID);
 const hasOutline = sections.length >= 2;
 const morph = (part: string) =>
   transitionName ? `view-transition-name: ${transitionName}-${part}` : undefined;

@@ -170,3 +170,14 @@ h2:hover > .heading-anchor::before,
 .heading-anchor:focus-visible::before {
   opacity: 1;
 }
+
+/* Links that leave the site (src/markdown/externalLinks.ts). */
+.external-link::after {
+  content: '↗' / ' (external link)';
+  display: inline-block;
+  margin-left: 0.1em;
+  font-size: 0.7em;
+  line-height: 1;
+  vertical-align: super;
+  text-decoration: none;
+}
