@@ -78,7 +78,7 @@ Then another wall, this time with a much simpler structure and a smaller load ca
 
 ### Laser engraving
 
-I bought this wonderful beast: the [xTool P2S](???).
+I bought this wonderful beast: the [xTool P2S](https://www.xtool.com/products/xtool-p2-55w-co2-laser-cutter).
 
 <Photo image={xtoolP2s} alt="The xTool P2S laser engraver" />
 
@@ -86,7 +86,7 @@ The original idea was to make engraved or cut pieces of wood and acrylic for the
 
 To my surprise, it is pretty simple to operate.
 As input, it takes basically just an SVG file with some custom metadata, such as the laser strength and speed for each path.
-Controlling a CO2 [laser engraver](???) is much simpler than controlling an average 3D printer.
+Controlling a CO2 [laser engraver](https://en.wikipedia.org/wiki/Laser_engraving) is much simpler than controlling an average 3D printer.
 The art is in getting to know all the possible materials and how each of them reacts to the laser.
 
 An example of my playing with engraving:
@@ -101,7 +101,7 @@ I am no 3D printing specialist. The following paragraphs go through my early exp
 **TL;DR:** it is more complicated than I expected.
 </Note>
 
-I started with a [Prusa Core One L](??) and later bought a [Bambu Lab H2S](???) as well.
+I started with a [Prusa Core One L](https://www.prusa3d.com/product/prusa-core-one-l/) and later bought a [Bambu Lab H2S](https://bambulab.com/en-us/h2s) as well.
 
 Every 3D printing enthusiast realizes sooner or later that to unlock the full potential, they have to create their own 3D models.
 With all the AI tools around today, that should be pretty easy, right?
@@ -115,36 +115,36 @@ When it comes to creating and customizing 3D models, I think I have tried just a
 
 #### CAD
 
-On the [CAD](???) side, I used [Autodesk Fusion](???) for some time.
+On the [CAD](https://en.wikipedia.org/wiki/Computer-aided_design) side, I used [Autodesk Fusion](https://www.autodesk.com/products/fusion-360/overview) for some time.
 When I started with Fusion, they were in the middle of moving file storage to the cloud, and the UI kept freezing for incredibly long periods.
 I believe they synced the files with the cloud on the main thread.
 It took a few version upgrades until they fixed the issue, but by then it had made me stop using the software.
 
-[Shapr3D](???) seemed nice, but it lacked some features, especially when creating [sketches](???).
+[Shapr3D](https://www.shapr3d.com/) seemed nice, but it lacked some features, especially when creating [sketches](https://support.shapr3d.com/hc/en-us/articles/12470029834908-Shapr3D-fundamentals).
 Its free plan allows only two projects, which is too limiting compared to Fusion.
 
-[FreeCAD](???) is close to my heart, since I generally like and try to encourage open-source projects.
-With its [Python bindings](???) it offers a comfortable way to let your AI agent fiddle with models.
+[FreeCAD](https://www.freecad.org/) is close to my heart, since I generally like and try to encourage open-source projects.
+With its [Python bindings](https://wiki.freecad.org/Python_scripting_tutorial) it offers a comfortable way to let your AI agent fiddle with models.
 The downside is its enormous complexity and occasional crashes.
 
-I ended up with [Onshape](???): browser-only CAD software that is, surprisingly, the fastest of all the tools I tried.
+I ended up with [Onshape](https://www.onshape.com/): browser-only CAD software that is, surprisingly, the fastest of all the tools I tried.
 On a free plan, you can create as many models as you want; they are just public.
 
 #### Mesh editing
 
-[Blender](???) is a very capable open-source option.
-Nowadays, [Blender with MCP](???) seems to be the way to go for many artists and enthusiasts.
+[Blender](https://www.blender.org/) is a very capable open-source option.
+Nowadays, [Blender with MCP](https://www.blender.org/lab/mcp-server/) seems to be the way to go for many artists and enthusiasts.
 I have not tried it yet though.
 
 Claude falls short when it has to mimic natural textures.
 For those, you have to use a different AI tool, one based on image diffusion models.
-For generating models, I would recommend [MeshyAI](???), but if you want your model to be truly printable, it may be inevitable to do some final modifications in Blender manually.
+For generating models, I would recommend [MeshyAI](https://www.meshy.ai/), but if you want your model to be truly printable, it may be inevitable to do some final modifications in Blender manually.
 
 #### My workflow
 
 My workflow depends on how complex the thing I want to create is:
 
-- **Simple geometry:** I create the whole model in [Onshape](???), with Claude helping me with some features through an MCP server, feed it into the 3D slicer, and send it to the printer.
+- **Simple geometry:** I create the whole model in Onshape, with Claude helping me with some features through an MCP server, feed it into the 3D slicer, and send it to the printer.
 - **Something more complex, or a change to an existing model:** things get more complicated.
   Existing 3D models are usually published only as `STL` files, with no CAD files, so you can open them only in Blender or other mesh-editing software.
   I edit them in Blender, or I generate a new model with MeshyAI.
