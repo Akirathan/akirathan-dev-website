@@ -40,12 +40,7 @@ function el(tagName: string, className: string, children: ElementContent[], prop
 function referencesSection(references: Reference[]): Element {
   const items = references.map(({ url, name }) =>
     el('li', 'my-0 pl-1', [
-      el(
-        'a',
-        'external-link text-muted no-underline underline-offset-2 hover:text-paper hover:underline',
-        [text(name)],
-        { href: url, ...NEW_TAB },
-      ),
+      el('a', 'external-link text-muted hover:text-paper', [text(name)], { href: url, ...NEW_TAB }),
       el('span', 'block truncate text-xs text-muted/70', [text(url.replace(/^https?:\/\//, ''))]),
     ]),
   );
