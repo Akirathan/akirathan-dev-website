@@ -1,10 +1,16 @@
 ---
 import github from '@tabler/icons/outline/brand-github.svg?raw';
+import { lastCommit } from '../data/build';
 
 const year = new Date().getFullYear();
 const repo = 'Akirathan/akirathan-dev-website';
 const repoLabel = 'Source code';
 const status = 'Open to new roles';
+const updated = lastCommit?.date.toLocaleDateString('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
 ---
 
 <footer class="border-t border-white/10 bg-ink/40 text-sm text-subtle backdrop-blur-md">
@@ -33,13 +39,32 @@ const status = 'Open to new roles';
         {repoLabel}
       </a>
     </nav>
-    <p class="flex flex-col gap-1 text-xs sm:flex-row sm:gap-2">
-      <span>© {year} Pavel Marek</span>
-      <span aria-hidden="true" class="hidden sm:inline">
-        ·
-      </span>
-      <a href="/about#how-it-was-made">Written by me, built with Claude</a>
-    </p>
+    <div class="flex flex-col items-center gap-1.5">
+      <p class="flex flex-col gap-1 text-xs sm:flex-row sm:gap-2">
+        <span>© {year} Pavel Marek</span>
+        <span aria-hidden="true" class="hidden sm:inline">
+          ·
+        </span>
+        <a href="/about#how-it-was-made">Written by me, built with Claude</a>
+      </p>
+      {lastCommit && (
+        <p class="text-xs">
+          Updated <time datetime={lastCommit.date.toISOString()}>{updated}</time>
+          <span aria-hidden="true" class="mx-1">
+            ·
+          </span>
+          <a
+            href={`https://github.com/${repo}/commit/${lastCommit.hash}`}
+            rel="noopener"
+            target="_blank"
+            class="font-mono"
+            aria-label={`Commit ${lastCommit.shortHash} on GitHub`}
+          >
+            {lastCommit.shortHash}
+          </a>
+        </p>
+      )}
+    </div>
   </div>
 </footer>
 
