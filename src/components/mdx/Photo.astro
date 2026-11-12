@@ -1,0 +1,29 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+/**
+ * One photo inside an MDX article, framed like a PhotoSwipe gallery.
+ *
+ * Usage in .mdx:
+ *   import Photo from '../../components/mdx/Photo.astro';
+ *   import a from '../../assets/x/a.jpg';
+ *   <Photo image={a} alt="..." />
+ */
+interface Props {
+  image: ImageMetadata;
+  alt: string;
+}
+
+const { image, alt } = Astro.props;
+---
+
+<figure class="not-prose my-12">
+  <Image
+    src={image}
+    alt={alt}
+    width={1400}
+    format="webp"
+    class="mx-auto max-h-[70vh] w-auto rounded-2xl"
+  />
+</figure>

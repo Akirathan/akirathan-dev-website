@@ -3,22 +3,149 @@ title: Hobbies
 tagline: Life away from the keyboard.
 order: 7
 summary:
-  - I run a dog breeding station.
-  - Plants, obviously. Enough to open a showroom.
-  - 'Making things by hand: steel, 3D printing, laser engraving.'
+  - 'Making things by hand: steel, laser engraving, 3D printing.'
+  - I run a registered dog kennel.
 draft: true
 ---
 
-> Draft. Pavel will expand this page.
-
-## Dog breeding station
-
-To be written: the breed, the station name, and a few photographs.
-
-## Plants
-
-A hobby that became a business: see [Lístky radosti](/work/listky-radosti).
+import PhotoSwipe from "@/components/mdx/PhotoSwipe.astro";
+import Photo from "@/components/mdx/Photo.astro";
+import Note from "@/components/mdx/Note.astro";
+import verticalWallGrid from "@/assets/hobbies/vertical-wall-grid.jpg";
+import verticalWallBuilt1 from "@/assets/hobbies/vertical-wall-built-1.jpg";
+import verticalWallBuilt2 from "@/assets/hobbies/vertical-wall-built-2.jpg";
+import asianWallGrid from "@/assets/hobbies/asian-wall-grid.jpg";
+import asianWallBuilt1 from "@/assets/hobbies/asian-wall-built-1.jpg";
+import asianWallBuilt2 from "@/assets/hobbies/asian-wall-built-2.jpg";
+import coco2 from "@/assets/hobbies/coco-2.jpg";
+import dog01 from "@/assets/hobbies/dog-01.jpg";
+import dog02 from "@/assets/hobbies/dog-02.jpg";
+import dog03 from "@/assets/hobbies/dog-03.jpg";
+import xtoolP2s from "@/assets/hobbies/xtool-p2s.jpg";
+import koreny from "@/assets/hobbies/koreny-vyziva.jpg";
 
 ## Making things
 
-A steel grid for a vertical grow system, 3D printing, and laser engraving.
+Making things by hand: steel, laser engraving and 3D printing.
+
+### Steel
+
+I used to be somebody who could barely use a screwdriver.
+I would never have believed that one day I would build a steel structure that holds almost a ton.
+
+It started as something that simply had to be done for [Lístky radosti](/work/listky-radosti), and I could not find a contractor quickly enough.
+In the end, it turned into a hobby, and I hope to keep doing it in my spare time.
+
+Many broken drills, injured fingers and steel shavings later, I had built this steel grid:
+
+<PhotoSwipe
+  images={[verticalWallGrid, verticalWallBuilt1, verticalWallBuilt2]}
+  alts={[
+    "Vertical wall grid",
+    "Vertical wall almost built",
+    "Vertical wall built"
+  ]}
+/>
+
+Then another wall, this time with a much simpler structure and a smaller load capacity:
+
+<PhotoSwipe
+  images={[asianWallGrid, asianWallBuilt1, asianWallBuilt2]}
+  alts={[
+    "Asian wall grid",
+    "Asian wall almost built",
+    "Asian wall built"
+  ]}
+/>
+
+### Laser engraving
+
+I bought this wonderful beast: the [xTool P2S](https://www.xtool.com/products/xtool-p2-55w-co2-laser-cutter).
+
+<Photo image={xtoolP2s} alt="The xTool P2S laser engraver" />
+
+The original idea was to make engraved or cut pieces of wood and acrylic for the business: signs with room names for our showroom, or custom plant supports.
+
+To my surprise, it is pretty simple to operate.
+As input, it takes basically just an SVG file with some custom metadata, such as the laser strength and speed for each path.
+Controlling a CO2 [laser engraver](https://en.wikipedia.org/wiki/Laser_engraving) is much simpler than controlling an average 3D printer.
+The art is in getting to know all the possible materials and how each of them reacts to the laser.
+
+An example of my playing with engraving:
+
+<Photo image={koreny} alt="Laser-cut lettering and engraved wooden signs on a showroom wall" />
+
+### 3D printing
+
+<Note label="Disclaimer">
+I am no 3D printing specialist. The following paragraphs go through my early experiences with 3D printing.
+
+**TL;DR:** it is more complicated than I expected.
+</Note>
+
+I started with a [Prusa Core One L](https://www.prusa3d.com/product/prusa-core-one-l/) and later bought a [Bambu Lab H2S](https://bambulab.com/en-us/h2s) as well.
+
+Every 3D printing enthusiast realizes sooner or later that to unlock the full potential, they have to create their own 3D models.
+With all the AI tools around today, that should be pretty easy, right?
+Not quite, unfortunately.
+The AI tools can certainly help, but they still lack a lot of features.
+One of the first times I ran out of tokens was when I tried to convince Claude to make a 3D model _watertight_ (manifold).
+In the end, I had to fix it myself, manually, in Blender.
+
+When it comes to creating and customizing 3D models, I think I have tried just about every tool that offers a free trial.
+
+#### CAD
+
+On the [CAD](https://en.wikipedia.org/wiki/Computer-aided_design) side, I used [Autodesk Fusion](https://www.autodesk.com/products/fusion-360/overview) for some time.
+When I started with Fusion, they were in the middle of moving file storage to the cloud, and the UI kept freezing for incredibly long periods.
+I believe they synced the files with the cloud on the main thread.
+It took a few version upgrades until they fixed the issue, but by then it had made me stop using the software.
+
+[Shapr3D](https://www.shapr3d.com/) seemed nice, but it lacked some features, especially when creating [sketches](https://support.shapr3d.com/hc/en-us/articles/12470029834908-Shapr3D-fundamentals).
+Its free plan allows only two projects, which is too limiting compared to Fusion.
+
+[FreeCAD](https://www.freecad.org/) is close to my heart, since I generally like and try to encourage open-source projects.
+With its [Python bindings](https://wiki.freecad.org/Python_scripting_tutorial) it offers a comfortable way to let your AI agent fiddle with models.
+The downside is its enormous complexity and occasional crashes.
+
+I ended up with [Onshape](https://www.onshape.com/): browser-only CAD software that is, surprisingly, the fastest of all the tools I tried.
+On a free plan, you can create as many models as you want; they are just public.
+
+#### Mesh editing
+
+[Blender](https://www.blender.org/) is a very capable open-source option.
+Nowadays, [Blender MCP](https://github.com/ahujasid/mcp-for-blender) seems to be the way to go for many artists and enthusiasts.
+I have not tried it yet though.
+
+Claude is great at generating quite complex geometry from scripts, but it falls short when it has to mimic natural textures.
+For those, you have to use a different AI tool, one based on image diffusion models.
+For generating models, I would recommend [MeshyAI](https://www.meshy.ai/), but if you want your model to be truly printable, it may be inevitable to do some final modifications in Blender manually.
+
+#### My workflow
+
+My workflow depends on how complex the thing I want to create is:
+
+- **Simple geometry:** I create the whole model in Onshape, with Claude helping me with some features through an MCP server, feed it into the 3D slicer, and send it to the printer.
+- **Something more complex, or a change to an existing model:** things get more complicated.
+  Existing 3D models are usually published only as `STL` files, with no CAD files, so you can open them only in Blender or other mesh-editing software.
+  I edit them in Blender, or I generate a new model with MeshyAI.
+
+
+## Dogs
+
+I have two Russian Tsvetnaya Bolonka dogs.
+Never heard of the breed? Think of a bichon: a cute, living ball of fluff.
+I also run a registered kennel, and we are expecting our second litter soon.
+
+<PhotoSwipe
+images={[coco2, dog01, dog02, dog03]}
+aspect={4 / 3}
+alts={[
+  "Coco on the sofa",
+  "Coco nursing her newborn puppies",
+  "A pile of puppies",
+  "Black puppies, a few weeks old"
+]}
+/>
+
+If you want to get into a cuteness overflow state, visit our official website, [Pikaro](https://pikaro.cz).

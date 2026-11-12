@@ -1,0 +1,28 @@
+---
+/**
+ * A quiet note inside an MDX article: a disclaimer, a caveat, a TL;DR.
+ *
+ * Usage in .mdx:
+ *   import Note from '../../components/mdx/Note.astro';
+ *   <Note label="Disclaimer">Text, with **Markdown** inside.</Note>
+ */
+interface Props {
+  label?: string;
+}
+
+const { label } = Astro.props;
+---
+
+<div
+  role="note"
+  class="not-prose my-8 rounded-xl border border-paper/15 px-5 py-3 text-sm leading-relaxed text-muted"
+>
+  {label && (
+    <p class="mb-1 font-heading text-xs font-semibold tracking-widest text-paper/70 uppercase">
+      {label}
+    </p>
+  )}
+  <div class="[&_a]:text-accent [&_a:hover]:underline [&_p]:my-1 [&_strong]:text-paper/85">
+    <slot />
+  </div>
+</div>

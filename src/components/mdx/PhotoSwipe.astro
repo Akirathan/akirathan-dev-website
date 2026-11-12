@@ -47,7 +47,6 @@ const faceUrls = faces.map((f) => f.src);
       data-photo-swipe
       data-faces={JSON.stringify(faceUrls)}
       data-alts={JSON.stringify(alts)}
-      data-aspect={aspect}
       tabindex="0"
       role="img"
       aria-label={alts[0]}
@@ -92,10 +91,8 @@ const faceUrls = faces.map((f) => f.src);
       const alts = JSON.parse(canvas.dataset.alts ?? '[]') as string[];
       try {
         const faces = JSON.parse(canvas.dataset.faces ?? '[]') as string[];
-        const aspect = Number(canvas.dataset.aspect) || 4 / 3;
         const gallery = await startPhotoSwipe(canvas, {
           faces,
-          aspect,
           autoAdvance: !reducedMotion,
           onChange(index) {
             canvas.setAttribute('aria-label', alts[index] ?? '');
