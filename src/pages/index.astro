@@ -16,8 +16,8 @@ const mainJobs = experience.filter((e) => !e.data.minor);
 const minorJobs = experience.filter((e) => e.data.minor);
 const topics = (await getCollection('topics')).sort(byOrder);
 // The About board: the first half of the topics left of the CPU, the rest right, in order.
-const aboutLeft = topics.slice(0, Math.ceil(topics.length / 2));
-const aboutRight = topics.slice(aboutLeft.length);
+const topicsLeft = topics.slice(0, Math.ceil(topics.length / 2));
+const topicsRight = topics.slice(topicsLeft.length);
 ---
 
 <BaseLayout animatedBackground>
@@ -41,10 +41,10 @@ const aboutRight = topics.slice(aboutLeft.length);
           See my work
         </a>
         <a
-          href="#about"
+          href="#beyond-the-cv"
           class="rounded-full border border-paper/20 px-5 py-2.5 text-sm font-semibold transition-colors hover:border-accent hover:text-accent"
         >
-          More about me
+          Beyond the CV
         </a>
       </div>
     </div>
@@ -128,9 +128,9 @@ const aboutRight = topics.slice(aboutLeft.length);
     </ul>
   </section>
 
-  <!-- About -->
-  <!-- About: the heading is printed on the CPU lid; the topics hang on wires at both sides. -->
-  <section id="about" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+  <!-- Beyond the CV: "Articles" is printed on the CPU lid; the topics hang on wires at both sides. -->
+  <section id="beyond-the-cv" class="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6">
+    <h2 class="reveal mb-10 text-3xl font-bold tracking-tight sm:text-4xl">Beyond the CV</h2>
     <div
       {...attr(hooks.wiredBoard)}
       {...attr(hooks.wiresFrom, '(min-width: 64rem)')}
@@ -142,12 +142,16 @@ const aboutRight = topics.slice(aboutLeft.length);
         class="pointer-events-none absolute inset-0 hidden h-full w-full overflow-visible opacity-0 transition-opacity duration-1000 group-data-wired:opacity-100 lg:block"
       ></svg>
       <div class="relative mx-auto mb-1 aspect-square w-44 sm:col-span-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:mb-0 lg:w-60 xl:w-64">
-        <h2 class="absolute inset-0 grid place-items-center text-3xl font-bold tracking-tight transition-opacity duration-1000 group-has-[[data-ready]]:opacity-0 sm:text-4xl">
-          About me
-        </h2>
-        <CpuScene text={['About me']} class="h-full w-full" />
+        <!-- Without a GPU the label shows in place of the chip. -->
+        <p
+          aria-hidden="true"
+          class="absolute inset-0 grid place-items-center font-heading text-3xl font-bold tracking-tight transition-opacity duration-1000 group-has-[[data-ready]]:opacity-0 sm:text-4xl"
+        >
+          Articles
+        </p>
+        <CpuScene text={['Articles']} class="h-full w-full" />
       </div>
-      {[aboutLeft, aboutRight].map((column, c) => (
+      {[topicsLeft, topicsRight].map((column, c) => (
         <div
           class:list={[
             'grid gap-5',
