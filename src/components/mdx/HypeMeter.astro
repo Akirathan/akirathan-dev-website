@@ -1,11 +1,15 @@
 ---
 /**
- * A 0-10 meter of the author's AI hype, from an angry mob (0) to a moon rocket (10).
+ * A 0-10 meter of the author's AI hype, from a broken bottle (0) to a blown mind (10).
+ * Icons: Noun Project (Pro license).
  *
  * Usage in .mdx:
  *   import HypeMeter from '@/components/mdx/HypeMeter.astro';
  *   <HypeMeter value={7} />
  */
+import AntiAi from '@/assets/hype/anti-ai.svg';
+import Overhyped from '@/assets/hype/overhyped.svg';
+
 interface Props {
   value: number;
   label?: string;
@@ -31,18 +35,7 @@ const level = Math.min(10, Math.max(0, Math.round(value)));
   </figcaption>
 
   <div aria-hidden="true" class="flex items-center gap-3">
-    <svg
-      viewBox="0 0 24 24"
-      class="size-7 shrink-0 text-subtle"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.6"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <title>{low}: grab the pitchforks</title>
-      <path d="M12 3v19M6 3v4.5c0 2.5 2.5 3.5 6 3.5s6-1 6-3.5V3" />
-    </svg>
+    <AntiAi class="size-12 shrink-0 fill-current text-paper/70" />
 
     <div class="relative flex-1">
       <div class="flex gap-1">
@@ -61,20 +54,7 @@ const level = Math.min(10, Math.max(0, Math.round(value)));
       </span>
     </div>
 
-    <svg
-      viewBox="0 0 24 24"
-      class="size-7 shrink-0 text-muted"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.6"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <title>{high}: to the moon</title>
-      <path d="M12 2c3 2.5 4.5 6 4.5 10v4h-9v-4c0-4 1.5-7.5 4.5-10z" />
-      <circle cx="12" cy="9" r="1.5" />
-      <path d="M7.5 12.5 5 15.5v3l2.5-1.5M16.5 12.5l2.5 3v3l-2.5-1.5M10 19c0 1.5 1 2.5 2 3 1-.5 2-1.5 2-3" />
-    </svg>
+    <Overhyped class="size-12 shrink-0 fill-current text-paper/70" />
   </div>
 
   <div aria-hidden="true" class="mt-7 flex justify-between text-xs text-muted">
