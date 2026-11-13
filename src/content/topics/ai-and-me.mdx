@@ -8,19 +8,83 @@ summary:
   - An AI-assisted 3D modelling pipeline, from prompt to CAD to the printer.
 ---
 
-> Draft. Pavel will expand this page.
+import Note from "@/components/mdx/Note.astro";
+import Subtitle from "@/components/mdx/Subtitle.astro";
+import HypeMeter from "@/components/mdx/HypeMeter.astro";
 
-I use AI where it actually helps. That sentence sounds obvious, but it took real use to find out
-where the line is.
+<HypeMeter value={7} />
 
-## Where it helps
+<Note label="TL;DR;">
+- I use AI agents [pragmatically](???), just like any other tool for day-to-day use.
+- I am no AI all-in extra hyped super user.
+</Note>
 
-- Daily coding, infrastructure, and admin automation with Claude Code.
-- Custom Claude Code skills for recurring workflows: tax, invoice, and payroll processing.
-- A 3D modelling pipeline for the plant business: Nano Banana and Meshy AI for the base model,
-  Claude Code for refinement and CAD step generation, and manual finishing in Blender, OnShape, or
-  Autodesk Fusion.
+## Early days
 
-## Where it does not
+Many years ago, I have started with Github Copilot.
+Since I was declared as an open source contributor, I got the Copilot for free, so why not to use it.
+At that time, it was pretty much inline code completion that generated nonsense 80% of the time.
+But the rest of the time, it was still quite useful, especially for unit tests with rather repetitive code.
 
-To be written.
+My friend introduced me to [Claude Code](???) few months after it was released.
+My first response was a shock, just like for many other people.
+I was genuinely impressed that now, the AI can scan the entire code base and just write code instead of me.
+
+
+## My setup nowadays
+
+Pretty soon, I have run into organization problems - having too many tabs opened in my terminal was just too chaotic for me.
+When looking for tools that could help me with that, I have encountered [Orca](???), an [ADE](???) (Agentic Development Environment) that lets you orchestrate dozens of subagents across dozens of worktrees while still keeping a good overview of what is going on.
+
+I don't have other subscription except for Claude.
+I don't see any need for it - Claude gets the job done for me pretty well.
+I have experimented with hosting an open-weight `qwen` model on a spare PC that is just sitting in a bedroom.
+It's results were so poor that I have dropped the experiment immediately.
+Apparently 6GB of VRAM is just too low.
+
+## What I use it for?
+
+<Subtitle>
+  Even better question: "What I **don't** use it for?"
+</Subtitle>
+
+Nowadays, I use Claude Code for pretty much everything.
+Ranging from accounting, analytics reporting, marketing, and code.
+Obviously, code writing seems to be its strongest trait.
+
+## To review or not to review?
+
+I approach reviewing code from Claude just like I approached reviewing code from my colleagues:
+- Understand the motivation and the gist of the change.
+- Always review tests as first, then identify the important things.
+  - For example, color of a button for an internal tool is super not important, fiddling client-sensitive data is important.
+- Don't peek into too much details, unless I am genuinely interested in them.
+- If the code is generally readable, approve. If not, try to steer the agent into more clean code and modify instructions.
+
+The only difference is that the back-and-forth is much quicker.
+
+I try to delegate more and more work to AI agents, but I still have trust issues.
+I guess this spans across the entire industry.
+I usually don't let them just run wild and publish any changes without at least a quick review.
+
+
+## Missing old days?
+
+Some devs say they miss the coding.
+I don't, at least not much.
+Writing code was never the biggest part of the job.
+I would estimate that I was writing code for at most 20% of the time, the rest I spent with **reading the code** - either doing reviews or reading some library code.
+From time to time, I satisfy my hunger for writing the code by rewriting some generated code that I don't like myself rather than re-prompting the agent.
+
+
+## My limitations
+
+I don't have experience in using AI agents at scale, in a team of multiple people, just like many other organizations.
+I am eager to learn more interesting patterns how to use it.
+
+To me, AI agent is just a magical black box that just spits out some output based on the context.
+I don't understand the details - too much statistical theory for my taste - and I don't want/need to understand it now, just like I don't need to understand the details of many other technologies that I use.
+
+
+
+

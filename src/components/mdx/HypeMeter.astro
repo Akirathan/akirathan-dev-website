@@ -1,0 +1,95 @@
+---
+/**
+ * A 0-10 meter of the author's AI hype, from a broken bottle (0) to a blown mind (10).
+ * Icons: Noun Project (Pro license).
+ *
+ * Usage in .mdx:
+ *   import HypeMeter from '@/components/mdx/HypeMeter.astro';
+ *   <HypeMeter value={7} />
+ */
+import AntiAi from '@/assets/hype/anti-ai.svg';
+import Overhyped from '@/assets/hype/overhyped.svg';
+
+interface Props {
+  value: number;
+  label?: string;
+  low?: string;
+  high?: string;
+}
+
+const { value, label = 'AI hype meter', low = 'Anti AI', high = 'Overhyped' } = Astro.props;
+const level = Math.min(10, Math.max(0, Math.round(value)));
+---
+
+<figure
+  role="meter"
+  aria-label={label}
+  aria-valuemin="0"
+  aria-valuemax="10"
+  aria-valuenow={level}
+  aria-valuetext={`${level} of 10, on a scale from ${low} to ${high}`}
+  class="not-prose my-8 rounded-xl border border-paper/15 px-5 py-4"
+>
+  <figcaption class="mb-3 font-heading text-xs font-semibold tracking-widest text-paper/70 uppercase">
+    {label}
+  </figcaption>
+
+  <div aria-hidden="true" class="flex items-center gap-3">
+    <AntiAi class="size-12 shrink-0 fill-current text-paper/70" />
+
+    <div class="relative flex-1">
+      <div class="flex gap-1">
+        {Array.from({ length: 10 }, (_, i) => (
+          <span
+            class:list={['h-3 flex-1 rounded-[3px]', i < level ? 'hype-on' : 'bg-paper/12']}
+            style={`--i: ${i}`}
+          />
+        ))}
+      </div>
+      <span
+        class="hype-pin absolute top-full mt-1.5 -translate-x-1/2 text-xs whitespace-nowrap text-accent"
+        style={`left: calc(${level * 10}% - 0.125rem)`}
+      >
+        ▲ me, {level}/10
+      </span>
+    </div>
+
+    <Overhyped class="size-12 shrink-0 fill-current text-paper/70" />
+  </div>
+
+  <div aria-hidden="true" class="mt-7 flex justify-between text-xs text-muted">
+    <span>{low}</span>
+    <span>{high}</span>
+  </div>
+</figure>
+
+<style>
+  @keyframes hype-fill {
+    from {
+      background-color: color-mix(in oklch, var(--color-paper) 12%, transparent);
+      scale: 1 0.4;
+    }
+  }
+
+  @keyframes hype-pin {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  .hype-on {
+    background-color: var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hype-on {
+      animation: hype-fill 320ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+      animation-delay: calc(300ms + var(--i) * 70ms);
+    }
+
+    .hype-pin {
+      animation: hype-pin 400ms cubic-bezier(0.2, 0.7, 0.3, 1) 1100ms both;
+    }
+  }
+</style>
