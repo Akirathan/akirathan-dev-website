@@ -1,12 +1,66 @@
 ---
-school: ???
-degree: ???
-field: ???
-period: ???
-location: ???
+school: Charles University
+degree: Bachelors & Masters
+field: Computer Science, System programming
+period: 2014-2020
+location: Prague, Czechia
 order: 1
 summary:
-  - ???
+  - A solid theoretical and practical background for everything I am doing on daily bases.
+  - Master's thesis: ALTREP for FastR as an internship at Oracle Labs.
 ---
 
-???
+I have learned a great deal of things at the university.
+Despite the obvious theoretical background, I have also played with some technologies that I would otherwise not be able to play with.
+For example:
+- [OpenMP](???).
+- [CUDA](???).
+- A custom scheduler for Kubernetes.
+- STM32
+
+## Compilers and interpreters
+This topic intrigued me ever since I heard the first lecture about dynamic compilation from [Jaroslav Tulach](https://wiki.apidesign.org/wiki/I).
+Later, I have chosen a closely related topic of my master's thesis and managed to connect the implementation part with an internship in [Oracle Labs](???).
+The topic was "Implementation of [ALTREP](???) for [FastR](???)".
+
+## Microcontrollers
+Playing with a small STM32 microcontroller - a single core, few KB RAM and 256 KB of flash memory.
+This was a nice low-level introduction to the SW world, where SW meets HW tightly.
+
+Done as a bachelor thesis with the goal to develop a thermostat with configurable temperature in certain periods for STM32 platform that is accessible through the internet.
+GH repo: [Akirathan/STM32-smart-heating](???).
+Later, I have started a part-time job in [ComAp](???) based on this work.
+
+Below, I list few surprises for anybody coming from a high-level SW world like JavaScript:
+
+### No dynamic memory allocation
+C++'s `new` operator does not work.
+More specifically, you can configure heap memory region in the linker script, but it was easier for me just not to do dynamic memory allocation.
+There is no operating system that would allocate a new memory page for you.
+There are even no virtual addressing instructions.
+The available memory is "allocated" during build time via the linker script - you have a hardcoded addresses of everything that you can use.
+
+### No parallelism
+There is, obviously, no parallelism when you have just a single core.
+But you can still somehow emulate asynchronous code by implementing handlers that will be called based on interrupts - for example when some internal clock ticks.
+
+### Bit manipulation
+Embedded programming, probably along with cryptography, is one of few fields where bit manipulation is very prevelant.
+Any interaction with the device, like lighting up a diode, reading a buffer from a network card, or holding a higher voltage on some wire, is done by writing or reading certain bits to some addresses.
+Usually, a decent embedded device manufacturer will publish source code that will do that for you, so you don't have to figure out which bit exactly you need to trigger.
+
+### Real-time OS is not an OS
+[Real-time OS] is not really an operating system.
+It is just a scheduler of tasks implemented as a bunch of assembly.
+
+
+Later on, this evolved into a contribution to Eclipse CDT - I have implemented a code generation feature there that generates code for virtual method overrides in C++.
+
+## Kubernetes scheduler
+Done at part of the *software project* - a team effort spanning an entire year.
+The goal was edge cloud optimization - guarantee certain latencies between clients and the cloud, e.t., responses will not take longer than 50ms for 90% requests.
+Achieved by monitoring the entire network, figuring out the optimal layout and possibly migrate some apps from nodes.
+
+## TFTP server
+Simple multi-threaded implementation of [TFTP](???) server as part of Unix class.
+GH repo: [Akirathan/tftp](???).
