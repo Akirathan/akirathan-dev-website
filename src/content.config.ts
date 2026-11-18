@@ -23,6 +23,24 @@ const experience = defineCollection({
   }),
 });
 
+/** Schools. The body is the long-form detail page. */
+const education = defineCollection({
+  loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/education' }),
+  schema: z.object({
+    school: z.string(),
+    degree: z.string(),
+    field: z.string(),
+    period: z.string(),
+    location: z.string(),
+    /** Lower comes first on the landing page. */
+    order: z.number(),
+    /** Short bullets shown on the landing-page card. Keep to three. */
+    summary: z.array(z.string()).max(4),
+    tags: z.array(z.string()).default([]),
+    links: z.array(link).default([]),
+  }),
+});
+
 /** Non-work sections about me: values, AI & me, hobbies, opinions, ... */
 const topics = defineCollection({
   loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/topics' }),
@@ -50,4 +68,4 @@ const skills = defineCollection({
   }),
 });
 
-export const collections = { experience, topics, skills };
+export const collections = { experience, education, topics, skills };

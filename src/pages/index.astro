@@ -14,6 +14,7 @@ const byOrder = <T extends { data: { order: number } }>(a: T, b: T) => a.data.or
 const experience = (await getCollection('experience')).sort(byOrder);
 const mainJobs = experience.filter((e) => !e.data.minor);
 const minorJobs = experience.filter((e) => e.data.minor);
+const education = (await getCollection('education')).sort(byOrder);
 const topics = (await getCollection('topics')).sort(byOrder);
 // The About board: the first half of the topics left of the CPU, the rest right, in order.
 const topicsLeft = topics.slice(0, Math.ceil(topics.length / 2));
@@ -109,6 +110,20 @@ const topicsRight = topics.slice(topicsLeft.length);
         ))}
       </p>
     )}
+    <div id="education" class="mt-12 scroll-mt-24">
+      <h3 class="reveal text-sm font-medium tracking-widest text-muted uppercase">Education</h3>
+      <div class="mt-4 grid gap-5 md:grid-cols-3">
+        {education.map((school) => (
+          <Card
+            href={`/education/${school.id}`}
+            eyebrow={school.data.period}
+            title={school.data.school}
+            meta={`${school.data.degree}, ${school.data.field}`}
+            bullets={school.data.summary}
+          />
+        ))}
+      </div>
+    </div>
   </section>
 
   <!-- Skills -->
